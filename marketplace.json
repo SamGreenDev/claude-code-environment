@@ -1,0 +1,40 @@
+{
+  "name": "environment",
+  "version": "1.0.2",
+  "description": "Visual dashboard for viewing and configuring your Claude Code environment",
+  "author": "Sam Green",
+  "license": "MIT",
+  "ui": {
+    "port": 3848,
+    "server": "server.js",
+    "pages": [
+      { "name": "Dashboard", "route": "/" },
+      { "name": "Agents", "route": "/#/agents" },
+      { "name": "Skills", "route": "/#/skills" },
+      { "name": "Commands", "route": "/#/commands" },
+      { "name": "Knowledge", "route": "/#/knowledge" },
+      { "name": "Rules", "route": "/#/rules" },
+      { "name": "Plugins", "route": "/#/plugins" },
+      { "name": "MCP Servers", "route": "/#/mcp-servers" },
+      { "name": "Lessons", "route": "/#/lessons" },
+      { "name": "Settings", "route": "/#/settings" }
+    ]
+  },
+  "skills": [
+    {
+      "name": "ui",
+      "path": "skills/ui/SKILL.md",
+      "description": "Launch the Environment Dashboard web UI"
+    },
+    {
+      "name": "uninstall",
+      "path": "skills/uninstall/SKILL.md",
+      "description": "Completely remove environment plugin and all installed components"
+    },
+    {
+      "name": "screenshots",
+      "path": "skills/screenshots/SKILL.md",
+      "description": "Generate PDF with screenshots of all environment web UI pages"
+    }
+  ]
+}

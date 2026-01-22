@@ -1,0 +1,12 @@
+{
+  "name": "environment",
+  "description": "Visual dashboard for Claude Code environment configuration",
+  "version": "1.0.2",
+  "author": {
+    "name": "Sam Green",
+    "email": "samuel.green2k@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": ["dashboard", "configuration", "visualization"],
+  "engines": { "node": ">=18.0.0" }
+}
