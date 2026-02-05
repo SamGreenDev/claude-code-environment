@@ -1,0 +1,8 @@
+{
+  "name": "environment",
+  "description": "Visual dashboard for viewing and configuring your Claude Code environment",
+  "author": {
+    "name": "Sam Green",
+    "email": "samuel.green2k@gmail.com"
+  }
+}

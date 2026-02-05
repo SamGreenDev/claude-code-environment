@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+if command -v node >/dev/null 2>&1; then
+  NODE_VERSION=$(node -v 2>/dev/null | sed 's/v//' | cut -d'.' -f1)
+  if [ "$NODE_VERSION" -ge 18 ] 2>/dev/null; then
+    exec node "$(dirname "$0")/install.mjs" "$@"
+  fi
+fi
+if [ -f "$(dirname "$0")/install.sh" ]; then
+  exec bash "$(dirname "$0")/install.sh" "$@"
+fi
+echo "ERROR: Node.js 18+ or bash required"
+exit 1

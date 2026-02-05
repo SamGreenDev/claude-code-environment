@@ -1,0 +1,24 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "sam-green-plugins",
+  "version": "1.0.0",
+  "description": "Sam Green's Claude Code plugins",
+  "owner": {
+    "name": "Sam Green",
+    "email": "samuel.green2k@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "environment",
+      "description": "Visual dashboard for viewing and configuring your Claude Code environment",
+      "version": "1.1.0",
+      "author": {
+        "name": "Sam Green",
+        "email": "samuel.green2k@gmail.com"
+      },
+      "source": ".",
+      "category": "productivity",
+      "homepage": "https://github.com/SamGreenDev/claude-code-environment"
+    }
+  ]
+}
