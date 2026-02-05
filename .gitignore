@@ -18,6 +18,7 @@ dist/
 
 # Agent state (temporary)
 .agent-state.json
+.session-state.json
 
 # Temporary deployment docs
 DEPLOYMENT_INSTRUCTIONS.md
