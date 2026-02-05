@@ -16,7 +16,7 @@
         "name": "Sam Green",
         "email": "samuel.green2k@gmail.com"
       },
-      "source": ".",
+      "source": "./",
       "category": "productivity",
       "homepage": "https://github.com/SamGreenDev/claude-code-environment"
     }
