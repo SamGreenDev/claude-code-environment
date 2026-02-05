@@ -154,7 +154,78 @@ if [ -d "$PLUGIN_DIR/skills" ]; then
   done
 fi
 
-# ─── 8. Write manifest ──────────────────────────────────────────────────────
+# ─── 8. Install hooks into settings.json ────────────────────────────────────
+info "Configuring Claude Code hooks…"
+SETTINGS_FILE="$HOME/.claude/settings.json"
+NODE_BIN=$(command -v node 2>/dev/null || echo "$NODE_DIR/bin/node")
+
+if [ -x "$NODE_BIN" ]; then
+  "$NODE_BIN" -e '
+const fs = require("fs");
+const settingsPath = process.argv[1];
+const pluginDir = process.argv[2];
+
+// Load or create settings
+let settings = {};
+try { settings = JSON.parse(fs.readFileSync(settingsPath, "utf8")); } catch {}
+if (!settings.hooks) settings.hooks = {};
+
+const hooksDir = pluginDir + "/hooks";
+
+// Hooks this plugin needs
+const requiredHooks = {
+  SessionStart: [
+    { matcher: ".*", hooks: [{ type: "command", command: "~/.claude/plugins/local/environment/hooks/emit-session.sh register", async: true }] }
+  ],
+  SessionEnd: [
+    { matcher: ".*", hooks: [{ type: "command", command: "~/.claude/plugins/local/environment/hooks/emit-session.sh deregister", async: true }] }
+  ],
+  SubagentStart: [
+    { matcher: ".*", hooks: [{ type: "command", command: "~/.claude/plugins/local/environment/hooks/emit-activity.sh spawn", async: true }] }
+  ],
+  SubagentStop: [
+    { matcher: ".*", hooks: [{ type: "command", command: "~/.claude/plugins/local/environment/hooks/emit-activity.sh complete", async: true }] }
+  ],
+  PreToolUse: [
+    { matcher: ".*", hooks: [{ type: "command", command: "~/.claude/plugins/local/environment/hooks/emit-session.sh register", async: true }] },
+    { matcher: "Task", hooks: [{ type: "command", command: "~/.claude/plugins/local/environment/hooks/emit-activity.sh task", async: true }] }
+  ],
+  PostToolUse: [
+    { matcher: ".*", hooks: [{ type: "command", command: "~/.claude/plugins/local/environment/hooks/emit-session.sh activity", async: true }] }
+  ]
+};
+
+const pluginPrefix = "~/.claude/plugins/local/environment/";
+
+for (const [event, entries] of Object.entries(requiredHooks)) {
+  if (!settings.hooks[event]) settings.hooks[event] = [];
+  for (const entry of entries) {
+    // Check if this exact hook already exists (by command string)
+    const cmdStr = entry.hooks[0].command;
+    const exists = settings.hooks[event].some(existing =>
+      existing.hooks && existing.hooks.some(h => h.command === cmdStr)
+    );
+    if (!exists) {
+      settings.hooks[event].push(entry);
+    }
+  }
+}
+
+fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+process.stdout.write("ok");
+' "$SETTINGS_FILE" "$PLUGIN_DIR"
+
+  if [ $? -eq 0 ]; then
+    ok "Hooks configured in $SETTINGS_FILE"
+  else
+    warn "Could not configure hooks — you may need to add them manually"
+  fi
+else
+  warn "Node.js not available — skipping hook configuration"
+  warn "See README.md for manual hook setup instructions"
+fi
+
+# ─── 9. Write manifest ───────────────────────────────────────────────────────
 VERSION=$(grep '"version"' "$PLUGIN_DIR/package.json" 2>/dev/null | head -1 | grep -o '[0-9]*\.[0-9]*\.[0-9]*' || echo "unknown")
 cat > "$PLUGIN_DIR/.installed-manifest.json" <<EOF
 {
@@ -168,9 +239,8 @@ cat > "$PLUGIN_DIR/.installed-manifest.json" <<EOF
 EOF
 ok "Wrote install manifest"
 
-# ─── 9. Health check ────────────────────────────────────────────────────────
+# ─── 10. Health check ────────────────────────────────────────────────────────
 info "Running health check…"
-NODE_BIN=$(command -v node 2>/dev/null || echo "$NODE_DIR/bin/node")
 
 if [ ! -x "$NODE_BIN" ]; then
   warn "No usable node binary found — skipping health check"
