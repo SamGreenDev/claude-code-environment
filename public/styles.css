@@ -1587,6 +1587,123 @@ body::after {
   opacity: 0.8;
 }
 
+.hook-source {
+  font-size: 0.625rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hook-source.source-user {
+  color: var(--text-muted);
+  background: var(--bg-hover);
+}
+
+.hook-source.source-plugin {
+  color: var(--accent);
+  background: rgba(199, 70, 52, 0.12);
+}
+
+/* Grouped Hooks */
+.hook-group {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: var(--space-sm);
+}
+
+.hook-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition-fast);
+}
+
+.hook-group-header:hover {
+  background: var(--bg-hover);
+}
+
+.hook-group-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.hook-group-chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.hook-group.collapsed .hook-group-chevron {
+  transform: rotate(-90deg);
+}
+
+.hook-group-label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  text-transform: capitalize;
+}
+
+.hook-group-badge {
+  font-size: 0.625rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  background: rgba(199, 70, 52, 0.12);
+}
+
+.hook-group-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+}
+
+.hook-group-master {
+  flex-shrink: 0;
+}
+
+.hook-group-items {
+  display: flex;
+  flex-direction: column;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+  max-height: 1000px;
+  opacity: 1;
+}
+
+.hook-group.collapsed .hook-group-items {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.hook-group-items .hook-item {
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.hook-group-items .hook-item:last-child {
+  border-bottom: 0;
+}
+
+.hook-group-items .hook-item::before {
+  display: none;
+}
+
 /* Toggle Switch - Industrial Style */
 .toggle {
   position: relative;

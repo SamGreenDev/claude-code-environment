@@ -64,10 +64,22 @@ const ANIMATION_FRAME_DURATION = 150; // ms per sprite frame
 
 // Agent type to Jedi class mapping
 const JEDI_CLASS_MAP = {
+  // Built-in agent types (from SubagentStart hook)
   'Explore': 'scholar',
   'Plan': 'council',
   'Bash': 'guardian',
   'general-purpose': 'padawan',
+
+  // Custom agent types (from Task tool subagent_type)
+  'code-reviewer': 'sentinel',
+  'security-reviewer': 'sentinel',
+  'architect': 'council',
+  'refactor-cleaner': 'sentinel',
+  'e2e-runner': 'guardian',
+  'consistency-auditor': 'sentinel',
+  'plugin-deployer': 'guardian',
+
+  // Legacy names
   'code-quality-agent': 'sentinel',
   'netsuite-specialist': 'consular',
   'deploy-agent': 'guardian',
@@ -76,6 +88,7 @@ const JEDI_CLASS_MAP = {
   'apex-specialist': 'consular',
   'claude-code-guide': 'scholar',
   'statusline-setup': 'padawan',
+
   'default': 'padawan'
 };
 

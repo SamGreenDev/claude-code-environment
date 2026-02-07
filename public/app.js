@@ -22,6 +22,15 @@ function initializeTheme() {
 }
 
 /**
+ * Escape HTML to prevent XSS in innerHTML
+ */
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/**
  * Show toast notification
  */
 function showToast(message, type = 'info') {
@@ -111,7 +120,7 @@ const state = {
   plugins: [],
   mcpServers: [],
   knowledge: null,
-  hooks: [],
+  groupedHooks: null,
   lessons: [],
   lessonsStats: null,
   currentRoute: '',
@@ -951,7 +960,7 @@ async function loadKnowledgeFile(container, filePath) {
       }
     });
   } catch (error) {
-    container.innerHTML = `<div class="empty-state"><p>Failed to load file: ${error.message}</p></div>`;
+    container.innerHTML = `<div class="empty-state"><p>Failed to load file: ${escapeHtml(error.message)}</p></div>`;
   }
 }
 
@@ -1229,13 +1238,13 @@ async function renderSettingsPage() {
   showLoading(main);
 
   try {
-    const [settingsRes, hooksRes, projectRes] = await Promise.all([
+    const [settingsRes, groupedHooksRes, projectRes] = await Promise.all([
       api('/settings'),
-      api('/hooks'),
+      api('/hooks?grouped=true'),
       api('/project'),
     ]);
 
-    state.hooks = hooksRes.hooks;
+    state.groupedHooks = groupedHooksRes;
     const settings = settingsRes.settings;
     const schema = settingsRes.schema;
 
@@ -1275,30 +1284,23 @@ async function renderSettingsPage() {
       setProjectBtn.classList.add('btn-primary');
       projectStatus.innerHTML = '';
 
-      // Clear and render user hooks
+      // Clear and render grouped hooks
       hooksList.innerHTML = '';
-      if (state.hooks.length === 0) {
+      const grouped = state.groupedHooks;
+      const allHooks = [...(grouped.user || []), ...Object.values(grouped.plugins || {}).flat()];
+
+      if (allHooks.length === 0) {
         hooksList.innerHTML = '<p class="empty-state-small">No hooks configured</p>';
       } else {
-        state.hooks.forEach(hook => {
-          const item = templates.hookItem.content.cloneNode(true);
-          item.querySelector('.hook-name').textContent = hook.name;
-          item.querySelector('.hook-type').textContent = hook.type;
-          const matcherEl = item.querySelector('.hook-matcher');
-          if (hook.matcher && hook.matcher !== '*') {
-            matcherEl.textContent = hook.matcher;
-          } else {
-            matcherEl.style.display = 'none';
-          }
+        // User hooks group
+        if (grouped.user && grouped.user.length > 0) {
+          hooksList.appendChild(createHookGroup('User Hooks', 'user', grouped.user, 'user'));
+        }
 
-          const toggle = item.querySelector('.hook-toggle');
-          toggle.dataset.hookId = hook.id;
-          toggle.dataset.level = 'user';
-          toggle.checked = hook.enabled;
-          toggle.addEventListener('change', () => toggleHook(hook.id, toggle, 'user'));
-
-          hooksList.appendChild(item);
-        });
+        // Plugin hook groups
+        for (const [pluginName, pluginHooks] of Object.entries(grouped.plugins || {})) {
+          hooksList.appendChild(createHookGroup(pluginName, pluginName, pluginHooks, 'user'));
+        }
       }
 
       // Clear and render user env vars
@@ -1338,7 +1340,7 @@ async function renderSettingsPage() {
                 <span class="project-status-icon">⚠️</span>
                 <span class="project-status-title">Not a Claude Project</span>
               </div>
-              <div class="project-status-path">${projectPath}</div>
+              <div class="project-status-path">${escapeHtml(projectPath)}</div>
               <p style="margin-top: 8px; font-size: 0.875rem; color: var(--text-secondary);">
                 This directory does not have a .claude folder. Run <code>/project-init</code> to set it up.
               </p>
@@ -1359,7 +1361,7 @@ async function renderSettingsPage() {
           <div class="project-status success">
             <div class="project-status-header">
               <span class="project-status-icon">✓</span>
-              <span class="project-status-title">${projectPath.split('/').pop()}</span>
+              <span class="project-status-title">${escapeHtml(projectPath.split('/').pop())}</span>
             </div>
             <div class="project-files">
               <span class="project-file-badge ${projectData.hasClaudeMd ? 'exists' : 'missing'}">
@@ -1381,30 +1383,14 @@ async function renderSettingsPage() {
         if (projectHooks.length === 0) {
           hooksList.innerHTML = '<div class="empty-state-small">No project hooks configured</div>';
         } else {
-          projectHooks.forEach(hook => {
-            const item = templates.hookItem.content.cloneNode(true);
-            item.querySelector('.hook-name').textContent = hook.name;
-            item.querySelector('.hook-type').textContent = hook.type;
-            const matcherEl = item.querySelector('.hook-matcher');
-            if (hook.matcher && hook.matcher !== '*') {
-              matcherEl.textContent = hook.matcher;
-            } else {
-              matcherEl.style.display = 'none';
-            }
-
-            const toggle = item.querySelector('.hook-toggle');
-            toggle.dataset.hookId = hook.id;
-            toggle.dataset.level = 'project';
-            toggle.checked = hook.enabled;
-            toggle.addEventListener('change', () => toggleHook(hook.id, toggle, 'project'));
-
-            hooksList.appendChild(item);
-          });
+          hooksList.appendChild(createHookGroup('Project Hooks', 'project', projectHooks.map(h => ({
+            ...h, sourceType: 'project'
+          })), 'project'));
         }
 
         // Clear and render project env vars
         envVars.innerHTML = '';
-        const mergedEnv = { ...projectEnvRes.env, ...projectEnvRes.localEnv };
+        const mergedEnv = projectEnvRes.merged || { ...projectEnvRes.env, ...projectEnvRes.localEnv };
         const envSchema = schema?.env || {};
 
         if (Object.keys(envSchema).length === 0) {
@@ -1426,7 +1412,7 @@ async function renderSettingsPage() {
               <span class="project-status-icon">⚠️</span>
               <span class="project-status-title">Error Loading Project</span>
             </div>
-            <div class="project-status-path">${error.message}</div>
+            <div class="project-status-path">${escapeHtml(error.message)}</div>
           </div>
         `;
       }
@@ -1436,8 +1422,12 @@ async function renderSettingsPage() {
     setProjectBtn.addEventListener('click', async () => {
       if (settingsViewMode === 'project') {
         // Close project settings - switch back to user view
+        try {
+          await api('/project', { method: 'PUT', body: { path: '' } });
+        } catch (error) {
+          showToast(`Failed to close project: ${error.message}`, 'error');
+        }
         activeProjectPath = null;
-        await api('/project', { method: 'PUT', body: { path: '' } }).catch(() => {});
         renderUserSettings();
       } else {
         // Set project - switch to project view
@@ -1461,7 +1451,7 @@ async function renderSettingsPage() {
                 <span class="project-status-icon">⚠️</span>
                 <span class="project-status-title">Error</span>
               </div>
-              <div class="project-status-path">${error.message}</div>
+              <div class="project-status-path">${escapeHtml(error.message)}</div>
             </div>
           `;
         } finally {
@@ -1518,7 +1508,7 @@ function renderBooleanSetting(container, key, config, value, level = 'user') {
       descEl.textContent = config.description || '';
     } catch (error) {
       toggle.checked = !toggle.checked; // Revert on error
-      console.error('Failed to update setting:', error);
+      showToast(`Failed to update ${config.label}: ${error.message}`, 'error');
     }
   });
 
@@ -1569,31 +1559,196 @@ function renderSelectSetting(container, key, config, value, level = 'user') {
       // Revert to previous value
       const prevOption = Array.from(select.options).find(o => o.value === (value || '__inherit__'));
       if (prevOption) prevOption.selected = true;
-      console.error('Failed to update setting:', error);
+      showToast(`Failed to update ${config.label}: ${error.message}`, 'error');
     }
   });
 
   container.appendChild(item);
 }
 
-async function toggleHook(id, toggle, level = 'user') {
+/**
+ * Create a collapsible hook group section
+ */
+function createHookGroup(label, groupId, hooks, level) {
+  const group = document.createElement('div');
+  group.className = 'hook-group';
+  group.dataset.groupId = groupId;
+
+  // Determine group type: user, plugin, or project
+  const isProject = level === 'project';
+  const isPlugin = !isProject && groupId !== 'user';
+  const groupType = isProject ? 'project' : (isPlugin ? 'plugin' : 'user');
+  const enabledCount = hooks.filter(h => h.enabled).length;
+  // Bulk toggle is only supported for user-level groups (user and plugin), not project
+  const supportsBulkToggle = !isProject;
+
+  // Group header
+  const header = document.createElement('div');
+  header.className = 'hook-group-header';
+  header.innerHTML = `
+    <div class="hook-group-left">
+      <svg class="hook-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+      <span class="hook-group-label">${isPlugin ? escapeHtml(label) : (isProject ? 'Project Hooks' : 'User Hooks')}</span>
+      ${isPlugin ? '<span class="hook-group-badge">plugin</span>' : ''}
+      <span class="hook-group-count">${enabledCount}/${hooks.length} active</span>
+    </div>
+    ${supportsBulkToggle ? `
+    <label class="toggle hook-group-master" title="Toggle all hooks in this group">
+      <input type="checkbox" class="hook-group-toggle">
+      <span class="toggle-slider"></span>
+    </label>` : ''}
+  `;
+
+  // Master toggle state (only if supported)
+  const masterToggle = header.querySelector('.hook-group-toggle');
+  if (masterToggle) {
+    masterToggle.checked = enabledCount === hooks.length;
+    masterToggle.indeterminate = enabledCount > 0 && enabledCount < hooks.length;
+
+    // Stop propagation so it doesn't toggle collapse
+    const masterLabel = header.querySelector('.hook-group-master');
+    masterLabel.addEventListener('click', (e) => e.stopPropagation());
+
+    masterToggle.addEventListener('change', async () => {
+      const enabled = masterToggle.checked;
+      try {
+        await api(`/hooks/group/${groupType}/${encodeURIComponent(groupId)}/toggle`, {
+          method: 'PUT',
+          body: { enabled }
+        });
+        // Sync local state and refresh toggles
+        hooks.forEach(h => { h.enabled = enabled; });
+        const itemToggles = items.querySelectorAll('.hook-toggle');
+        itemToggles.forEach(t => { t.checked = enabled; });
+        masterToggle.indeterminate = false;
+        countEl.textContent = `${enabled ? hooks.length : 0}/${hooks.length} active`;
+        showToast(`${enabled ? 'Enabled' : 'Disabled'} all ${escapeHtml(label)} hooks`, 'success');
+      } catch (error) {
+        masterToggle.checked = !enabled;
+        showToast(`Failed to toggle group: ${error.message}`, 'error');
+      }
+    });
+  }
+
+  // Items container
+  const items = document.createElement('div');
+  items.className = 'hook-group-items';
+
+  hooks.forEach(hook => {
+    items.appendChild(createHookItem(hook, level, masterToggle, hooks));
+  });
+
+  // Collapse/expand with localStorage persistence
+  const countEl = header.querySelector('.hook-group-count');
+  const expandedGroups = JSON.parse(localStorage.getItem('claude-hooks-expanded') || '[]');
+  if (!expandedGroups.includes(groupId)) {
+    group.classList.add('collapsed');
+  }
+
+  header.addEventListener('click', () => {
+    group.classList.toggle('collapsed');
+    const stored = JSON.parse(localStorage.getItem('claude-hooks-expanded') || '[]');
+    if (group.classList.contains('collapsed')) {
+      const idx = stored.indexOf(groupId);
+      if (idx !== -1) stored.splice(idx, 1);
+    } else {
+      if (!stored.includes(groupId)) stored.push(groupId);
+    }
+    localStorage.setItem('claude-hooks-expanded', JSON.stringify(stored));
+  });
+
+  group.appendChild(header);
+  group.appendChild(items);
+
+  return group;
+}
+
+/**
+ * Create a single hook item row
+ */
+function createHookItem(hook, level, masterToggle, groupHooks) {
+  const item = templates.hookItem.content.cloneNode(true);
+  item.querySelector('.hook-name').textContent = hook.name;
+  item.querySelector('.hook-type').textContent = hook.type;
+
+  const matcherEl = item.querySelector('.hook-matcher');
+  if (hook.matcher && hook.matcher !== '*') {
+    matcherEl.textContent = hook.matcher;
+  } else {
+    matcherEl.style.display = 'none';
+  }
+
+  // Hide source badge (grouping already indicates source)
+  const sourceEl = item.querySelector('.hook-source');
+  sourceEl.style.display = 'none';
+
+  const toggle = item.querySelector('.hook-toggle');
+  toggle.dataset.hookId = hook.id;
+  toggle.dataset.level = level;
+  toggle.checked = hook.enabled;
+  toggle.addEventListener('change', () => {
+    toggleHook(hook.id, toggle, level, masterToggle, groupHooks);
+  });
+
+  return item;
+}
+
+async function toggleHook(id, toggle, level = 'user', masterToggle = null, groupHooks = null) {
+  // Validate hook ID format — plugin hooks use "plugin:name:type.x.y", user hooks use "type.x.y"
+  const isPluginHook = id.startsWith('plugin:');
+  if (!isPluginHook) {
+    const parts = id.split('.');
+    if (parts.length !== 3 || isNaN(parts[1]) || isNaN(parts[2])) {
+      showToast('Invalid hook ID format', 'error');
+      toggle.checked = !toggle.checked;
+      return;
+    }
+  }
+
   try {
     if (level === 'project') {
       await api(`/project/hooks/${encodeURIComponent(id)}/toggle`, { method: 'PUT' });
     } else {
-      await api(`/hooks/${encodeURIComponent(id)}/toggle`, { method: 'PUT' });
+      const result = await api(`/hooks/${encodeURIComponent(id)}/toggle`, { method: 'PUT' });
+      // Update local grouped state
+      const allHooks = [
+        ...(state.groupedHooks?.user || []),
+        ...Object.values(state.groupedHooks?.plugins || {}).flat()
+      ];
+      const hook = allHooks.find(h => h.id === id);
+      if (hook) {
+        hook.enabled = result.enabled;
+      }
     }
+
+    // Update master toggle if present
+    if (masterToggle && groupHooks) {
+      const enabledCount = groupHooks.filter(h => h.enabled).length;
+      masterToggle.checked = enabledCount === groupHooks.length;
+      masterToggle.indeterminate = enabledCount > 0 && enabledCount < groupHooks.length;
+      // Update count text
+      const countEl = masterToggle.closest('.hook-group-header')?.querySelector('.hook-group-count');
+      if (countEl) {
+        countEl.textContent = `${enabledCount}/${groupHooks.length} active`;
+      }
+    }
+
+    showToast('Hook toggled successfully', 'success');
   } catch (error) {
     toggle.checked = !toggle.checked; // Revert
-    console.error('Failed to toggle hook:', error);
+    showToast(`Failed to toggle hook: ${error.message}`, 'error');
   }
 }
 
 async function updateEnvVar(key, value, level = 'user') {
   if (level === 'project') {
-    // For project level, don't send if value is null (inherit)
     if (value === null) {
-      // Could implement delete, for now just skip
+      // Delete the key to inherit from user settings
+      await api(`/project/env/${encodeURIComponent(key)}`, {
+        method: 'DELETE'
+      });
       return;
     }
     await api(`/project/env/${encodeURIComponent(key)}`, {

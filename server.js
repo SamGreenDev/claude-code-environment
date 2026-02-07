@@ -13,7 +13,7 @@ import { fileURLToPath } from 'url';
 
 import { createRouter, sendFile, sendJson, getContentType } from './lib/router.js';
 import { registerApiRoutes } from './lib/api-handlers.js';
-import { initWebSocket, registerActivityRoutes } from './lib/activity-handler.js';
+import { initWebSocket, registerActivityRoutes, shutdown as shutdownActivity } from './lib/activity-handler.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, 'public');
@@ -183,7 +183,24 @@ server.listen(PORT, () => {
 // Handle graceful shutdown
 process.on('SIGINT', () => {
   console.log('\n[environment] Shutting down...');
+
+  // Clear the auto-shutdown timer
+  if (shutdownTimer) {
+    clearTimeout(shutdownTimer);
+    shutdownTimer = null;
+  }
+
+  // Clear activity timers and close WebSocket clients
+  shutdownActivity();
+
+  // Close HTTP server (stops accepting new connections)
+  const forceTimer = setTimeout(() => {
+    console.log('[environment] Forcing exit...');
+    process.exit(0);
+  }, 1000);
+
   server.close(() => {
+    clearTimeout(forceTimer);
     process.exit(0);
   });
 });

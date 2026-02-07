@@ -40,8 +40,7 @@ json_value_raw() {
 case "$EVENT_TYPE" in
   spawn)
     # SubagentStart hook - agent is starting
-    # Expected fields: agent_id, agent_type (from Claude Code hook context)
-    # IMPORTANT: agent_id is unique per subagent, session_id is shared by parent session
+    # Server correlates with metadata stored by PreToolUse[Task] via session_id
 
     AGENT_ID=$(json_value "agent_id")
     if [ -z "$AGENT_ID" ]; then
@@ -51,43 +50,24 @@ case "$EVENT_TYPE" in
       AGENT_ID="agent-$(date +%s)-$$"
     fi
 
-    AGENT_TYPE=$(json_value "subagent_type")
-    if [ -z "$AGENT_TYPE" ]; then
-      AGENT_TYPE=$(json_value "agent_type")
-    fi
+    SESSION_ID=$(json_value "session_id")
+
+    AGENT_TYPE=$(json_value "agent_type")
     if [ -z "$AGENT_TYPE" ]; then
       AGENT_TYPE="general-purpose"
     fi
 
-    DESCRIPTION=$(json_value "description")
-    if [ -z "$DESCRIPTION" ]; then
-      DESCRIPTION=$(json_value "prompt" | head -c 100)
+    if [ -f /tmp/emit-activity-debug ]; then
+      echo "[emit-activity] spawn - agent_id=$AGENT_ID session_id=$SESSION_ID agent_type=$AGENT_TYPE" >> /tmp/emit-activity.log
     fi
 
-    # Try to get description from task queue (populated by PreToolUse[Task])
-    if [ -z "$DESCRIPTION" ]; then
-      QUEUE_FILE="/tmp/jedi-task-queue/pending"
-      if [ -f "$QUEUE_FILE" ] && [ -s "$QUEUE_FILE" ]; then
-        # Read and remove first line (FIFO)
-        DESCRIPTION=$(head -1 "$QUEUE_FILE")
-        sed -i '' '1d' "$QUEUE_FILE" 2>/dev/null || sed -i '1d' "$QUEUE_FILE" 2>/dev/null
-        if [ -f /tmp/emit-activity-debug ]; then
-          echo "[emit-activity] spawn - got description from queue: $DESCRIPTION" >> /tmp/emit-activity.log
-        fi
-      fi
-    fi
-
-    if [ -z "$DESCRIPTION" ]; then
-      DESCRIPTION="Working on task..."
-    fi
-
-    # Send spawn event
+    # Send spawn event (server looks up metadata using sessionId)
     curl -s -X POST "${SERVER_URL}/api/activity/spawn" \
       -H "Content-Type: application/json" \
       -d "{
         \"agentId\": \"$AGENT_ID\",
-        \"agentType\": \"$AGENT_TYPE\",
-        \"taskDescription\": \"$DESCRIPTION\"
+        \"sessionId\": \"$SESSION_ID\",
+        \"agentType\": \"$AGENT_TYPE\"
       }" > /dev/null 2>&1 &
     ;;
 
@@ -117,22 +97,27 @@ case "$EVENT_TYPE" in
     ;;
 
   task)
-    # PreToolUse[Task] hook - captures task description for SubagentStart to use
-    # This fires BEFORE SubagentStart, so we queue the description for later pickup
+    # PreToolUse[Task] hook - store metadata on server for correlation with SubagentStart
 
-    TASK_DESC=$(json_value "description")
-    if [ -z "$TASK_DESC" ]; then
-      TASK_DESC=$(json_value "prompt" | head -c 100)
+    SESSION_ID=$(json_value "session_id")
+    SUBAGENT_TYPE=$(json_value "subagent_type")
+
+    DESCRIPTION=$(json_value "description")
+    if [ -z "$DESCRIPTION" ]; then
+      DESCRIPTION=$(json_value "prompt" | head -c 100)
     fi
 
-    if [ -n "$TASK_DESC" ]; then
-      # Queue the description for the next SubagentStart to pick up
-      QUEUE_DIR="/tmp/jedi-task-queue"
-      mkdir -p "$QUEUE_DIR"
-      echo "$TASK_DESC" >> "$QUEUE_DIR/pending"
+    if [ -n "$SESSION_ID" ] && [ "$SESSION_ID" != "null" ]; then
+      curl -s -X POST "${SERVER_URL}/api/activity/metadata" \
+        -H "Content-Type: application/json" \
+        -d "{
+          \"sessionId\": \"$SESSION_ID\",
+          \"subagentType\": \"$SUBAGENT_TYPE\",
+          \"description\": \"$DESCRIPTION\"
+        }" > /dev/null 2>&1 &
 
       if [ -f /tmp/emit-activity-debug ]; then
-        echo "[emit-activity] task event - queued description: $TASK_DESC" >> /tmp/emit-activity.log
+        echo "[emit-activity] task event - stored metadata for session $SESSION_ID: $SUBAGENT_TYPE - $DESCRIPTION" >> /tmp/emit-activity.log
       fi
     fi
     ;;
