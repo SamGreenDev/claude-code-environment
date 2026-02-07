@@ -39,23 +39,10 @@ const COLORS = {
   textDim: '#4a6a8a'
 };
 
-// Terminal positions (12 terminals in 2 rows of 6)
-const TERMINAL_POSITIONS = [
-  // Row 1 (top) - terminals 0-5
-  { x: 100, y: 180 },
-  { x: 240, y: 180 },
-  { x: 380, y: 180 },
-  { x: 520, y: 180 },
-  { x: 660, y: 180 },
-  { x: 800, y: 180 },
-  // Row 2 (bottom) - terminals 6-11
-  { x: 100, y: 400 },
-  { x: 240, y: 400 },
-  { x: 380, y: 400 },
-  { x: 520, y: 400 },
-  { x: 660, y: 400 },
-  { x: 800, y: 400 }
-];
+// Terminal positions - dynamically sized (initialized as 2x6 grid, recalculated at runtime)
+const COLS = 6;
+const MAX_ROWS = 4;
+let TERMINAL_POSITIONS = [];
 
 // Animation timing
 const FRAME_RATE = 60;
@@ -186,25 +173,35 @@ class JediArchives {
     this.width = rect.width;
     this.height = rect.height;
 
-    // Recalculate terminal positions based on canvas size
-    this.calculateTerminalPositions();
+    // Recalculate terminal positions based on canvas size and agent count
+    this.calculateTerminalPositions(this.agents ? this.agents.size : 0);
   }
 
-  calculateTerminalPositions() {
+  calculateTerminalPositions(agentCount) {
+    const rows = Math.min(MAX_ROWS, Math.max(2, Math.ceil((agentCount || 0) / COLS)));
     const margin = 140;
     const usableWidth = this.width - (margin * 2);
-    const spacing = usableWidth / 5;
+    const spacing = usableWidth / (COLS - 1);
 
-    // Update terminal positions
-    for (let row = 0; row < 2; row++) {
-      for (let col = 0; col < 6; col++) {
-        const index = row * 6 + col;
-        TERMINAL_POSITIONS[index] = {
+    // Distribute rows evenly between 20% and 85% of canvas height
+    const topFraction = 0.20;
+    const bottomFraction = 0.85;
+
+    const newPositions = [];
+    for (let row = 0; row < rows; row++) {
+      const yFraction = rows === 1
+        ? (topFraction + bottomFraction) / 2
+        : topFraction + (row / (rows - 1)) * (bottomFraction - topFraction);
+      for (let col = 0; col < COLS; col++) {
+        newPositions.push({
           x: margin + (col * spacing),
-          y: row === 0 ? this.height * 0.32 : this.height * 0.72
-        };
+          y: this.height * yFraction
+        });
       }
     }
+
+    TERMINAL_POSITIONS = newPositions;
+    this._gridRows = rows;
   }
 
   // ============================================================
@@ -284,6 +281,18 @@ class JediArchives {
   // ============================================================
 
   addAgent(agentData) {
+    // Assign a real terminal index if missing
+    if (agentData.terminalIndex == null) {
+      agentData.terminalIndex = this.agents.size;
+    }
+
+    // Recalculate grid if we need more slots
+    const totalNeeded = Math.max(agentData.terminalIndex + 1, this.agents.size + 1);
+    if (totalNeeded > TERMINAL_POSITIONS.length) {
+      this.calculateTerminalPositions(totalNeeded);
+      this._repositionExistingAgents();
+    }
+
     const terminal = TERMINAL_POSITIONS[agentData.terminalIndex] || TERMINAL_POSITIONS[0];
 
     const agent = {
@@ -310,6 +319,18 @@ class JediArchives {
     console.log('[JediArchives] Agent added:', agentData.id);
   }
 
+  _repositionExistingAgents() {
+    // Update target positions for agents already on the grid
+    this.agents.forEach(agent => {
+      const terminal = TERMINAL_POSITIONS[agent.terminalIndex];
+      if (terminal) {
+        agent.targetX = terminal.x;
+        agent.targetY = terminal.y;
+        agent._arrived = false; // Trigger walk to new position
+      }
+    });
+  }
+
   updateAgent(agentData) {
     if (!this.agents.has(agentData.id)) {
       this.addAgent(agentData);
@@ -334,6 +355,13 @@ class JediArchives {
 
   removeAgent(agentId) {
     this.agents.delete(agentId);
+
+    // Shrink grid if we have fewer agents now
+    if (this.agents.size > 0) {
+      this.calculateTerminalPositions(this.agents.size);
+      this._repositionExistingAgents();
+    }
+
     console.log('[JediArchives] Agent removed:', agentId);
   }
 
@@ -897,19 +925,21 @@ class JediArchives {
 
   drawSpeechBubble(agent) {
     const ctx = this.ctx;
-    const padding = 10;
-    const maxBubbleWidth = 200;
-    const lineHeight = 14;
-    const maxLines = 5;
+    const dense = this.agents.size > 6;
+    const padding = dense ? 6 : 10;
+    const maxBubbleWidth = dense ? 160 : 200;
+    const lineHeight = dense ? 12 : 14;
+    const maxLines = dense ? 3 : 5;
+    const maxChars = dense ? 60 : 100;
 
-    // Truncate task description at 100 chars
+    // Truncate task description
     let text = agent.taskDescription;
-    if (text.length > 100) {
-      text = text.substring(0, 97) + '...';
+    if (text.length > maxChars) {
+      text = text.substring(0, maxChars - 3) + '...';
     }
 
     // Wrap text into lines
-    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.font = `${dense ? 10 : 11}px "JetBrains Mono", monospace`;
     const maxTextWidth = maxBubbleWidth - padding * 2;
     let lines = this.wrapText(ctx, text, maxTextWidth);
     if (lines.length > maxLines) {
@@ -927,7 +957,8 @@ class JediArchives {
     const bubbleHeight = lines.length * lineHeight + padding * 2;
 
     const x = agent.currentX;
-    const y = agent.currentY - 110 - (bubbleHeight - 24) / 2;
+    const bubbleOffset = dense ? 90 : 110;
+    const y = agent.currentY - bubbleOffset - (bubbleHeight - 24) / 2;
 
     // Holographic style bubble
     const bubbleX = x - bubbleWidth / 2;
