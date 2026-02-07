@@ -17,6 +17,13 @@ Launch the visual dashboard to view and configure your Claude Code environment.
 5. Open the browser to http://localhost:3848
 6. Report success with the URL and available pages
 
+## Plugin Root
+
+Before executing commands, determine the plugin installation directory:
+1. Read `~/.claude/plugins/installed_plugins.json`
+2. Find the entry with key starting with `environment@`
+3. Use its `installPath` value as `PLUGIN_DIR` in all commands below
+
 ## Execution
 
 First, check if the server is already running:
@@ -28,8 +35,8 @@ lsof -i :3848 | grep LISTEN
 If not running, start the server from the plugin directory:
 
 ```bash
-NODE_BIN=$(command -v node || echo "$HOME/.claude/plugins/local/environment/.node/bin/node")
-nohup "$NODE_BIN" "$HOME/.claude/plugins/local/environment/server.js" > /dev/null 2>&1 &
+PLUGIN_DIR="<installPath from installed_plugins.json>"
+nohup node "$PLUGIN_DIR/server.js" > /dev/null 2>&1 &
 sleep 1
 ```
 

@@ -17,6 +17,13 @@ Completely remove the environment plugin and all its installed components.
 5. Remove the plugin directory
 6. Confirm removal
 
+## Plugin Root
+
+Before executing commands, determine the plugin installation directory:
+1. Read `~/.claude/plugins/installed_plugins.json`
+2. Find the entry with key starting with `environment@`
+3. Use its `installPath` value as `PLUGIN_DIR` in all commands below
+
 ## Execution
 
 ### Step 1: Read Manifest
@@ -24,11 +31,12 @@ Completely remove the environment plugin and all its installed components.
 Read the manifest to find installed components:
 
 ```bash
-cat ~/.claude/plugins/local/environment/.installed-manifest.json 2>/dev/null || echo "No manifest found"
+PLUGIN_DIR="<installPath from installed_plugins.json>"
+cat "$PLUGIN_DIR/.installed-manifest.json" 2>/dev/null || echo "No manifest found"
 ```
 
 If manifest doesn't exist, use fallback paths:
-- Plugin: `~/.claude/plugins/local/environment`
+- Plugin: `PLUGIN_DIR` (from installed_plugins.json)
 - Skill: `~/.claude/skills/environment:ui`
 - Skill: `~/.claude/skills/environment:uninstall`
 - Skill: `~/.claude/skills/environment:screenshots`
@@ -51,12 +59,16 @@ rm -rf ~/.claude/skills/environment:uninstall
 rm -rf ~/.claude/skills/environment:screenshots
 ```
 
-### Step 4: Remove Plugin Directory
+### Step 4: Remove Plugin
 
-Remove the entire plugin directory:
+Remove the plugin entry. If installed from a marketplace, use:
+```
+/plugin uninstall environment@sam-green-marketplace
+```
 
+If installed locally, remove the plugin directory:
 ```bash
-rm -rf ~/.claude/plugins/local/environment
+rm -rf "$PLUGIN_DIR"
 ```
 
 ### Step 5: Confirm Removal
@@ -70,10 +82,10 @@ Removed:
 - Skill: /environment:ui
 - Skill: /environment:uninstall
 - Skill: /environment:screenshots
-- Plugin directory: ~/.claude/plugins/local/environment
+- Plugin (via marketplace uninstall or directory removal)
 
-To reinstall, run the installer again:
-  ./install.sh --fresh
+To reinstall from marketplace:
+  /plugin install environment@sam-green-marketplace
 ```
 
 ## Warning

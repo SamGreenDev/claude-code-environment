@@ -15,6 +15,13 @@ Read from `.claude-plugin/plugin.json`:
 - **Server**: server.js
 - **Pages**: Dashboard, Activity, Agents, Skills, Commands, Knowledge, Rules, Plugins, MCP Servers, Lessons, Settings
 
+## Plugin Root
+
+Before executing commands, determine the plugin installation directory:
+1. Read `~/.claude/plugins/installed_plugins.json`
+2. Find the entry with key starting with `environment@`
+3. Use its `installPath` value as `PLUGIN_DIR` in all commands below
+
 ## Instructions
 
 ### Step 1: Check if Server is Running
@@ -26,7 +33,8 @@ lsof -i :3848 -t 2>/dev/null || echo "not_running"
 If "not_running", start the server:
 
 ```bash
-nohup node ~/.claude/plugins/local/environment/server.js > /dev/null 2>&1 &
+PLUGIN_DIR="<installPath from installed_plugins.json>"
+nohup node "$PLUGIN_DIR/server.js" > /dev/null 2>&1 &
 sleep 2
 ```
 
@@ -106,8 +114,9 @@ async function createPDF(screenshots) {
   }
 
   const pdfBytes = await pdfDoc.save();
-  const outputPath = process.env.HOME + '/.claude/plugins/local/environment/screenshots/environment-screenshots.pdf';
-  await fs.mkdir(process.env.HOME + '/.claude/plugins/local/environment/screenshots', { recursive: true });
+  const pluginDir = process.env.PLUGIN_DIR || process.env.HOME + '/.claude/plugins/local/environment';
+  const outputPath = pluginDir + '/screenshots/environment-screenshots.pdf';
+  await fs.mkdir(pluginDir + '/screenshots', { recursive: true });
   await fs.writeFile(outputPath, pdfBytes);
   console.log('PDF created: ' + outputPath);
 }
@@ -147,6 +156,11 @@ rm -f /tmp/environment-screenshots.mjs /tmp/package.json /tmp/package-lock.json
 
 ## Output
 
-The PDF will be saved to: `~/.claude/plugins/local/environment/screenshots/environment-screenshots.pdf`
+The PDF will be saved to the `screenshots/` directory within the plugin installation path.
+
+When running the screenshot script, pass the plugin directory as an environment variable:
+```bash
+PLUGIN_DIR="<installPath from installed_plugins.json>" node environment-screenshots.mjs
+```
 
 Report the file location and size to the user when complete.
