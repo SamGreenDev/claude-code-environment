@@ -178,7 +178,7 @@ class JediArchives {
   }
 
   calculateTerminalPositions() {
-    const margin = 60;
+    const margin = 140;
     const usableWidth = this.width - (margin * 2);
     const spacing = usableWidth / 5;
 
@@ -431,15 +431,15 @@ class JediArchives {
 
     // Top architectural detail
     ctx.fillStyle = COLORS.bgLight;
-    ctx.fillRect(0, 0, this.width, 40);
+    ctx.fillRect(0, 0, this.width, 52);
 
     // Gold accent line
     ctx.strokeStyle = COLORS.archiveGold;
     ctx.lineWidth = 2;
     ctx.globalAlpha = 0.3;
     ctx.beginPath();
-    ctx.moveTo(0, 40);
-    ctx.lineTo(this.width, 40);
+    ctx.moveTo(0, 52);
+    ctx.lineTo(this.width, 52);
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
@@ -643,9 +643,8 @@ class JediArchives {
 
   updateAndDrawAgents(deltaTime) {
     this.agents.forEach(agent => {
-      // Update position based on status
-      if (agent.status === 'spawning' || agent.status === 'walking') {
-        // Move towards terminal
+      // Move toward target regardless of status (except leaving)
+      if (agent.status !== 'leaving') {
         const dx = agent.targetX - agent.currentX;
         const dy = agent.targetY - agent.currentY;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -654,9 +653,14 @@ class JediArchives {
           agent.currentX += (dx / dist) * WALK_SPEED;
           agent.currentY += (dy / dist) * WALK_SPEED;
           agent.direction = dx > 0 ? 1 : -1;
+          agent._arrived = false;
+        } else if (!agent._arrived) {
+          agent.currentX = agent.targetX;
+          agent.currentY = agent.targetY;
+          agent._arrived = true;
         }
-      } else if (agent.status === 'leaving') {
-        // Force ghost effect - stay in place and fade out
+      } else {
+        // Leaving - Force ghost effect, stay in place and fade out
         agent.forceGhostProgress = (agent.forceGhostProgress || 0) + 0.015;
 
         // Create occasional force sparkles during ghost transition
@@ -675,8 +679,10 @@ class JediArchives {
 
         // Fade out opacity as ghost transition progresses
         agent.opacity = Math.max(0, 1 - agent.forceGhostProgress);
-      } else if (agent.status === 'completing') {
-        // Completion animation
+      }
+
+      // Completion animation (runs alongside movement)
+      if (agent.status === 'completing') {
         agent.completionProgress = Math.min(1, agent.completionProgress + 0.02);
       }
 
@@ -720,18 +726,18 @@ class JediArchives {
       ctx.fill();
     }
 
-    // Determine animation frame
-    const isMoving = agent.status === 'walking';
+    // Determine animation frame - use arrival flag for movement detection
+    const isMoving = !agent._arrived && agent.status !== 'leaving';
     const walkFrame = isMoving ? Math.floor(this.animationFrame / 2) % 4 : 0;
 
     // Draw pixelated Jedi sprite (with force ghost tint when leaving)
     const isForceGhost = agent.status === 'leaving';
-    this.drawPixelJedi(x, y, config, agent.direction, walkFrame, agent.status, isForceGhost);
+    this.drawPixelJedi(x, y, config, agent.direction, walkFrame, agent.status, isForceGhost, isMoving);
 
     ctx.restore();
   }
 
-  drawPixelJedi(x, y, config, direction, walkFrame, status, isForceGhost = false) {
+  drawPixelJedi(x, y, config, direction, walkFrame, status, isForceGhost = false, isMoving = false) {
     const ctx = this.ctx;
     const scale = 2; // Pixel size
 
@@ -748,8 +754,8 @@ class JediArchives {
       ctx.translate(-x, 0);
     }
 
-    // Walking bob (disabled for ghost)
-    const bobOffset = (status === 'working' || isForceGhost) ? 0 : Math.sin(walkFrame * Math.PI / 2) * 2;
+    // Walking bob (disabled for ghost and when stationary at terminal)
+    const bobOffset = ((status === 'working' && !isMoving) || isForceGhost) ? 0 : Math.sin(walkFrame * Math.PI / 2) * 2;
 
     // Head
     ctx.fillStyle = isForceGhost ? ghostBlue : '#e8d4b8'; // Skin tone or ghost blue
@@ -802,7 +808,7 @@ class JediArchives {
 
     // Feet (simplified)
     ctx.fillStyle = isForceGhost ? ghostBlueDark : '#3a3a3a';
-    const footOffset = (!isForceGhost && status !== 'working') ? Math.abs(Math.sin(walkFrame * Math.PI / 2)) * 3 : 0;
+    const footOffset = (!isForceGhost && (isMoving || status !== 'working')) ? Math.abs(Math.sin(walkFrame * Math.PI / 2)) * 3 : 0;
     this.drawPixelRect(x - 4 * scale, y - 7 * scale, 3 * scale, 3 * scale);
     this.drawPixelRect(x + 1 * scale, y - 7 * scale + footOffset, 3 * scale, 3 * scale);
 
@@ -857,24 +863,58 @@ class JediArchives {
     });
   }
 
+  wrapText(ctx, text, maxWidth) {
+    const words = text.split(' ');
+    const lines = [];
+    let currentLine = words[0] || '';
+
+    for (let i = 1; i < words.length; i++) {
+      const testLine = currentLine + ' ' + words[i];
+      const testWidth = ctx.measureText(testLine).width;
+      if (testWidth > maxWidth) {
+        lines.push(currentLine);
+        currentLine = words[i];
+      } else {
+        currentLine = testLine;
+      }
+    }
+    lines.push(currentLine);
+    return lines;
+  }
+
   drawSpeechBubble(agent) {
     const ctx = this.ctx;
-    const x = agent.currentX;
-    const y = agent.currentY - 70;
+    const padding = 10;
+    const maxBubbleWidth = 200;
+    const lineHeight = 14;
+    const maxLines = 5;
 
-    // Truncate task description
+    // Truncate task description at 100 chars
     let text = agent.taskDescription;
-    if (text.length > 40) {
-      text = text.substring(0, 37) + '...';
+    if (text.length > 100) {
+      text = text.substring(0, 97) + '...';
     }
 
-    // Measure text
+    // Wrap text into lines
     ctx.font = '11px "JetBrains Mono", monospace';
-    const metrics = ctx.measureText(text);
-    const textWidth = metrics.width;
-    const padding = 10;
-    const bubbleWidth = textWidth + padding * 2;
-    const bubbleHeight = 24;
+    const maxTextWidth = maxBubbleWidth - padding * 2;
+    let lines = this.wrapText(ctx, text, maxTextWidth);
+    if (lines.length > maxLines) {
+      lines = lines.slice(0, maxLines);
+      lines[maxLines - 1] = lines[maxLines - 1].substring(0, lines[maxLines - 1].length - 3) + '...';
+    }
+
+    // Calculate bubble dimensions
+    let widestLine = 0;
+    for (const line of lines) {
+      const w = ctx.measureText(line).width;
+      if (w > widestLine) widestLine = w;
+    }
+    const bubbleWidth = Math.min(widestLine + padding * 2, maxBubbleWidth);
+    const bubbleHeight = lines.length * lineHeight + padding * 2;
+
+    const x = agent.currentX;
+    const y = agent.currentY - 110 - (bubbleHeight - 24) / 2;
 
     // Holographic style bubble
     const bubbleX = x - bubbleWidth / 2;
@@ -905,17 +945,20 @@ class JediArchives {
     ctx.fill();
     ctx.stroke();
 
-    // Text
+    // Draw wrapped text lines
     ctx.fillStyle = COLORS.textGlow;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, x, y);
+    const textStartY = bubbleY + padding + lineHeight / 2;
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], x, textStartY + i * lineHeight);
+    }
 
     // Jedi class indicator
     const config = JEDI_CONFIGS[agent.jediClass] || JEDI_CONFIGS.padawan;
     ctx.fillStyle = config.accentColor;
     ctx.font = '9px "JetBrains Mono", monospace';
-    ctx.fillText(config.name, x, y + 20);
+    ctx.fillText(config.name, x, bubbleY + bubbleHeight + 18);
   }
 
   roundRect(x, y, w, h, r) {
@@ -938,12 +981,12 @@ class JediArchives {
     ctx.fillStyle = COLORS.archiveGold;
     ctx.font = 'bold 16px "JetBrains Mono", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('JEDI ARCHIVES', this.width / 2, 25);
+    ctx.fillText('JEDI ARCHIVES', this.width / 2, 22);
 
     // Subtitle
     ctx.fillStyle = COLORS.textDim;
     ctx.font = '10px "JetBrains Mono", monospace';
-    ctx.fillText('HOLOCRON HALL - AGENT ACTIVITY', this.width / 2, 38);
+    ctx.fillText('HOLOCRON HALL - AGENT ACTIVITY', this.width / 2, 36);
 
     // Agent count
     const activeCount = Array.from(this.agents.values()).filter(
@@ -952,7 +995,7 @@ class JediArchives {
 
     ctx.textAlign = 'right';
     ctx.fillStyle = activeCount > 0 ? COLORS.holocronGlow : COLORS.textDim;
-    ctx.fillText(`${activeCount} ACTIVE`, this.width - 20, 25);
+    ctx.fillText(`${activeCount} ACTIVE`, this.width - 20, 22);
   }
 
   drawConnectionStatus() {

@@ -3428,6 +3428,7 @@ body::after {
   flex-direction: column;
   gap: var(--space-md);
   height: calc(100vh - 180px);
+  max-height: 900px;
   min-height: 500px;
   animation: page-enter 0.4s ease-out;
 }
@@ -3440,7 +3441,7 @@ body::after {
   border-radius: var(--radius-lg);
   overflow: hidden;
   position: relative;
-  min-height: 400px;
+  min-height: 500px;
 }
 
 /* Holocron glow border effect */

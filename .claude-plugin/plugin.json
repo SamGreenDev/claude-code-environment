@@ -1,5 +1,6 @@
 {
   "name": "environment",
+  "version": "1.1.0",
   "description": "Visual dashboard for viewing and configuring your Claude Code environment",
   "author": {
     "name": "Sam Green",
