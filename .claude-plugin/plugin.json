@@ -5,5 +5,9 @@
   "author": {
     "name": "Sam Green",
     "email": "samuel.green2k@gmail.com"
-  }
+  },
+  "homepage": "https://github.com/SamGreenDev/claude-code-environment",
+  "repository": "https://github.com/SamGreenDev/claude-code-environment",
+  "license": "MIT",
+  "keywords": ["environment", "dashboard", "configuration", "claude-code"]
 }

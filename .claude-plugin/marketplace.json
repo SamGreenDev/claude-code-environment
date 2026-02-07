@@ -20,5 +20,10 @@
       "category": "productivity",
       "homepage": "https://github.com/SamGreenDev/claude-code-environment"
     }
+  ],
+  "skills": [
+    { "name": "ui", "path": "skills/ui/SKILL.md", "description": "Launch the Environment Dashboard web UI" },
+    { "name": "screenshots", "path": "skills/screenshots/SKILL.md", "description": "Generate PDF with screenshots" },
+    { "name": "uninstall", "path": "skills/uninstall/SKILL.md", "description": "Remove environment plugin completely" }
   ]
 }
