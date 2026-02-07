@@ -1,6 +1,6 @@
 {
   "name": "environment",
-  "version": "1.1.0",
+  "version": "1.1.4",
   "description": "Visual dashboard for Claude Code environment with Jedi Archives agent visualization",
   "main": "server.js",
   "type": "module",
