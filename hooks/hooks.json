@@ -2,33 +2,53 @@
   "hooks": {
     "SessionStart": [
       {
-        "type": "command",
-        "command": "${CLAUDE_PLUGIN_ROOT}/hooks/emit-session.sh register"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/emit-session.sh register"
+          }
+        ]
       }
     ],
     "PreToolUse": [
       {
         "matcher": "Task",
-        "type": "command",
-        "command": "${CLAUDE_PLUGIN_ROOT}/hooks/emit-activity.sh task"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/emit-activity.sh task"
+          }
+        ]
       }
     ],
     "SubagentStart": [
       {
-        "type": "command",
-        "command": "${CLAUDE_PLUGIN_ROOT}/hooks/emit-activity.sh spawn"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/emit-activity.sh spawn"
+          }
+        ]
       }
     ],
     "SubagentStop": [
       {
-        "type": "command",
-        "command": "${CLAUDE_PLUGIN_ROOT}/hooks/emit-activity.sh complete"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/emit-activity.sh complete"
+          }
+        ]
       }
     ],
     "SessionEnd": [
       {
-        "type": "command",
-        "command": "${CLAUDE_PLUGIN_ROOT}/hooks/emit-session.sh deregister"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/emit-session.sh deregister"
+          }
+        ]
       }
     ]
   }
