@@ -30,11 +30,20 @@ fi
 
 # Helper function to extract JSON value
 json_value() {
-  echo "$PAYLOAD" | grep -o "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | sed 's/.*: *"\([^"]*\)".*/\1/' | head -1
+  printf '%s\n' "$PAYLOAD" | grep -o "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | sed 's/.*: *"\([^"]*\)".*/\1/' | head -1
 }
 
 json_value_raw() {
-  echo "$PAYLOAD" | grep -o "\"$1\"[[:space:]]*:[[:space:]]*[^,}]*" | sed 's/.*: *//' | tr -d '"}' | head -1
+  printf '%s\n' "$PAYLOAD" | grep -o "\"$1\"[[:space:]]*:[[:space:]]*[^,}]*" | sed 's/.*: *//' | tr -d '"}' | head -1
+}
+
+# Extract a nested JSON value, e.g. json_extract_nested "tool_input" "description"
+# Finds the parent object, then extracts the child key's string value
+json_extract_nested() {
+  local parent="$1"
+  local child="$2"
+  # Extract the parent object content, then find the child key within it
+  printf '%s\n' "$PAYLOAD" | sed "s/.*\"${parent}\"[[:space:]]*:[[:space:]]*{//" | sed 's/}.*//' | grep -o "\"${child}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | sed 's/.*: *"\([^"]*\)".*/\1/' | head -1
 }
 
 # Get or generate session ID
@@ -81,12 +90,12 @@ case "$EVENT_TYPE" in
       TTY_PATH=""
     fi
     TERM_APP="${TERM_PROGRAM:-unknown}"
-    WORKING_DIR=$(pwd)
-    # Walk up the process tree to find Claude Code's PID (not the hook script's PID)
-    PID=$(ps -o ppid= -p $PPID 2>/dev/null | tr -d ' ')
-    if [ -z "$PID" ] || [ "$PID" = "1" ]; then
-      PID=$PPID
+    WORKING_DIR=$(json_value "cwd")
+    if [ -z "$WORKING_DIR" ]; then
+      WORKING_DIR=$(pwd)
     fi
+    # $PPID is the Claude Code process that launched this hook script
+    PID=$PPID
 
     # Get terminal-specific window/session ID for focus switching
     TERMINAL_WINDOW_ID=""
@@ -101,8 +110,16 @@ case "$EVENT_TYPE" in
       TERMINAL_WINDOW_ID=$(get_terminal_window_id)
     fi
 
+    # Extract current task from tool_input if available
+    CURRENT_TASK=$(json_extract_nested "tool_input" "description")
+    if [ -z "$CURRENT_TASK" ]; then
+      CURRENT_TASK=$(json_extract_nested "tool_input" "prompt")
+    fi
+    # Escape double quotes for JSON safety
+    CURRENT_TASK=$(echo "$CURRENT_TASK" | sed 's/"/\\"/g' | head -c 200)
+
     if [ -f /tmp/emit-session-debug ]; then
-      echo "[emit-session] register - id=$SESSION_ID tty=$TTY_PATH app=$TERM_APP wid=$TERMINAL_WINDOW_ID" >> /tmp/emit-session.log
+      echo "[emit-session] register - id=$SESSION_ID tty=$TTY_PATH app=$TERM_APP wid=$TERMINAL_WINDOW_ID cwd=$WORKING_DIR task=$CURRENT_TASK" >> /tmp/emit-session.log
     fi
 
     # Send registration
@@ -114,7 +131,8 @@ case "$EVENT_TYPE" in
         \"ttyPath\": \"$TTY_PATH\",
         \"workingDirectory\": \"$WORKING_DIR\",
         \"terminalApp\": \"$TERM_APP\",
-        \"terminalWindowId\": \"$TERMINAL_WINDOW_ID\"
+        \"terminalWindowId\": \"$TERMINAL_WINDOW_ID\",
+        \"currentTask\": \"$CURRENT_TASK\"
       }" > /dev/null 2>&1 &
     ;;
 
@@ -154,10 +172,47 @@ case "$EVENT_TYPE" in
     if [ -z "$TOOL_NAME" ]; then
       TOOL_NAME=$(json_value "tool")
     fi
-    SUMMARY=$(json_value "summary" | head -c 100)
-    STATUS=$(json_value "status")
-    if [ -z "$STATUS" ]; then
-      STATUS="executing"
+    STATUS="executing"
+
+    # Extract a meaningful summary based on tool type
+    SUMMARY=""
+    case "$TOOL_NAME" in
+      Bash)
+        SUMMARY=$(json_extract_nested "tool_input" "description")
+        if [ -z "$SUMMARY" ]; then
+          SUMMARY=$(json_extract_nested "tool_input" "command" | head -c 80)
+        fi
+        ;;
+      Read|Write|Edit)
+        FPATH_TMP=$(json_extract_nested "tool_input" "file_path")
+        if [ -n "$FPATH_TMP" ]; then
+          SUMMARY=$(basename "$FPATH_TMP")
+        fi
+        ;;
+      Grep)
+        SUMMARY=$(json_extract_nested "tool_input" "pattern" | head -c 60)
+        ;;
+      Glob)
+        SUMMARY=$(json_extract_nested "tool_input" "pattern")
+        ;;
+      Task)
+        SUMMARY=$(json_extract_nested "tool_input" "description")
+        if [ -z "$SUMMARY" ]; then
+          SUMMARY=$(json_extract_nested "tool_input" "prompt" | head -c 80)
+        fi
+        ;;
+      WebSearch)
+        SUMMARY=$(json_extract_nested "tool_input" "query" | head -c 60)
+        ;;
+      WebFetch)
+        SUMMARY=$(json_extract_nested "tool_input" "url" | head -c 60)
+        ;;
+    esac
+    # Escape double quotes in summary for JSON safety
+    SUMMARY=$(echo "$SUMMARY" | sed 's/"/\\"/g' | head -c 100)
+
+    if [ -f /tmp/emit-session-debug ]; then
+      echo "[emit-session] activity - tool=$TOOL_NAME summary=$SUMMARY" >> /tmp/emit-session.log
     fi
 
     if [ -n "$SESSION_ID" ] && [ -n "$TOOL_NAME" ]; then

@@ -75,6 +75,7 @@ const JEDI_CLASS_MAP = {
   'apex-specialist': 'consular',
   'claude-code-guide': 'scholar',
   'statusline-setup': 'padawan',
+  'team-lead': 'council',
 
   'default': 'padawan'
 };
@@ -295,26 +296,38 @@ class JediArchives {
 
     const terminal = TERMINAL_POSITIONS[agentData.terminalIndex] || TERMINAL_POSITIONS[0];
 
+    // Calculate walk speed to reach terminal in ~2 seconds (120 frames)
+    const dx = terminal.x - this.width / 2;
+    const dy = terminal.y - (this.height + 50);
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const walkSpeed = Math.max(WALK_SPEED, dist / 120);
+
+    // If agent is already working (e.g. restored from saved state), start at terminal
+    const alreadyWorking = agentData.status === 'working';
+
     const agent = {
       ...agentData,
       // Visual state
-      currentX: this.width / 2,
-      currentY: this.height + 50,
+      currentX: alreadyWorking ? terminal.x : this.width / 2,
+      currentY: alreadyWorking ? terminal.y : this.height + 50,
       targetX: terminal.x,
       targetY: terminal.y,
+      walkSpeed,
       opacity: 1,
       animFrame: 0,
       direction: terminal.x > this.width / 2 ? 1 : -1,
       // Effects
-      glowIntensity: 0,
-      dataStreamActive: false,
+      glowIntensity: alreadyWorking ? 1 : 0,
+      dataStreamActive: alreadyWorking,
       completionProgress: 0
     };
 
     this.agents.set(agentData.id, agent);
 
-    // Create entrance particles
-    this.createSpawnParticles(agent.currentX, agent.currentY);
+    // Create entrance particles (only for new agents, not restored ones)
+    if (!alreadyWorking) {
+      this.createSpawnParticles(agent.currentX, agent.currentY);
+    }
 
     console.log('[JediArchives] Agent added:', agentData.id);
   }
@@ -342,6 +355,9 @@ class JediArchives {
 
     // Update visual state based on status
     if (agentData.status === 'working') {
+      // Snap to terminal position (walk animation may not have finished)
+      agent.currentX = agent.targetX;
+      agent.currentY = agent.targetY;
       agent.dataStreamActive = true;
       agent.glowIntensity = 1;
     } else if (agentData.status === 'completing') {
@@ -470,11 +486,11 @@ class JediArchives {
 
     ctx.globalAlpha = 1;
 
-    // Top architectural detail
+    // Top architectural detail - header panel
     ctx.fillStyle = COLORS.bgLight;
     ctx.fillRect(0, 0, this.width, 52);
 
-    // Gold accent line
+    // Gold accent line below header
     ctx.strokeStyle = COLORS.archiveGold;
     ctx.lineWidth = 2;
     ctx.globalAlpha = 0.3;
@@ -690,9 +706,10 @@ class JediArchives {
         const dy = agent.targetY - agent.currentY;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist > WALK_SPEED) {
-          agent.currentX += (dx / dist) * WALK_SPEED;
-          agent.currentY += (dy / dist) * WALK_SPEED;
+        const speed = agent.walkSpeed || WALK_SPEED;
+        if (dist > speed) {
+          agent.currentX += (dx / dist) * speed;
+          agent.currentY += (dy / dist) * speed;
           agent.direction = dx > 0 ? 1 : -1;
           agent._arrived = false;
         } else if (!agent._arrived) {
@@ -960,7 +977,6 @@ class JediArchives {
     const bubbleOffset = dense ? 90 : 110;
     const y = agent.currentY - bubbleOffset - (bubbleHeight - 24) / 2;
 
-    // Holographic style bubble
     const bubbleX = x - bubbleWidth / 2;
     const bubbleY = y - bubbleHeight / 2;
 

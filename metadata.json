@@ -24,6 +24,7 @@
     "./lib/memory-reader.js",
     "./lib/plugin-reader.js",
     "./lib/router.js",
+    "./lib/team-watcher.js",
     "./metadata.json",
     "./package.json",
     "./public/app.js",

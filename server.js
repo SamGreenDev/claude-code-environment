@@ -14,6 +14,8 @@ import { fileURLToPath } from 'url';
 import { createRouter, sendFile, sendJson, getContentType } from './lib/router.js';
 import { registerApiRoutes } from './lib/api-handlers.js';
 import { initWebSocket, registerActivityRoutes, shutdown as shutdownActivity } from './lib/activity-handler.js';
+import { registerSessionRoutes, addSessionClient, startHeartbeatChecker } from './lib/session-handler.js';
+import { startTeamWatcher } from './lib/team-watcher.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, 'public');
@@ -109,6 +111,7 @@ async function serveStatic(req, res) {
 const router = createRouter();
 registerApiRoutes(router);
 registerActivityRoutes(router);
+registerSessionRoutes(router);
 
 // Parse URL query string helper
 function parseQuery(url) {
@@ -150,8 +153,10 @@ const server = createServer(async (req, res) => {
 
 // Start server
 server.listen(PORT, () => {
-  // Initialize WebSocket for activity updates
-  initWebSocket(server);
+  // Initialize WebSocket for activity and session updates
+  initWebSocket(server, { onSessionConnection: addSessionClient });
+  startHeartbeatChecker();
+  startTeamWatcher();
 
   console.log(`
   ╔════════════════════════════════════════════╗
@@ -172,6 +177,7 @@ server.listen(PORT, () => {
   - Settings:     http://localhost:${PORT}/#/settings
 
   WebSocket:      ws://localhost:${PORT}/ws/activity
+  Sessions WS:    ws://localhost:${PORT}/ws/sessions
 
   Auto-shutdown after 30 minutes of inactivity.
   Press Ctrl+C to stop.
