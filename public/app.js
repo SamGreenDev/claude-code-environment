@@ -100,8 +100,7 @@ const templates = {
   knowledge: document.getElementById('knowledge-template'),
   mcpServers: document.getElementById('mcp-servers-template'),
   mcpServerCard: document.getElementById('mcp-server-card-template'),
-  lessons: document.getElementById('lessons-template'),
-  lessonCard: document.getElementById('lesson-card-template'),
+  memory: document.getElementById('memory-template'),
   settings: document.getElementById('settings-template'),
   hookItem: document.getElementById('hook-item-template'),
   envToggle: document.getElementById('env-toggle-template'),
@@ -121,8 +120,8 @@ const state = {
   mcpServers: [],
   knowledge: null,
   groupedHooks: null,
-  lessons: [],
-  lessonsStats: null,
+  memoryProjects: [],
+  memoryStats: null,
   currentRoute: '',
   modal: null,
   jediArchives: null, // Jedi Archives canvas instance
@@ -205,8 +204,8 @@ function handleRoute() {
     case 'knowledge':
       renderKnowledgePage(rest.join('/'));
       break;
-    case 'lessons':
-      renderLessonsPage();
+    case 'memory':
+      renderMemoryPage();
       break;
     case 'settings':
       renderSettingsPage();
@@ -965,34 +964,25 @@ async function loadKnowledgeFile(container, filePath) {
 }
 
 
-// Lessons Page
-async function renderLessonsPage() {
+// Memory Page
+async function renderMemoryPage() {
   const main = document.getElementById('main-content');
   showLoading(main);
 
   try {
-    const [lessonsRes, statsRes] = await Promise.all([
-      api('/lessons'),
-      api('/lessons/stats'),
-    ]);
+    const { projects, stats } = await api('/memory');
+    state.memoryProjects = projects || [];
+    state.memoryStats = stats || {};
 
-    state.lessons = lessonsRes.lessons || [];
-    state.lessonsStats = statsRes.stats || {};
-
-    const content = templates.lessons.content.cloneNode(true);
-    const statsContainer = content.getElementById('lessons-stats');
-    const lessonsList = content.getElementById('lessons-list');
-    const categoryFilter = content.getElementById('category-filter');
-    const techFilter = content.getElementById('tech-filter');
-    const searchInput = content.getElementById('lessons-search');
+    const content = templates.memory.content.cloneNode(true);
+    const statsContainer = content.getElementById('memory-stats');
+    const projectList = content.getElementById('memory-project-list');
 
     // Render stats
-    const stats = state.lessonsStats;
     const statItems = [
-      { icon: '📚', value: stats.total || 0, label: 'Total Lessons', subtitle: 'Captured corrections' },
-      { icon: '📅', value: stats.thisMonth || 0, label: 'This Month', subtitle: 'Recent learnings' },
-      { icon: '🎯', value: stats.totalHits || 0, label: 'Total Hits', subtitle: 'Times surfaced' },
-      { icon: '🏷️', value: Object.keys(stats.byCategory || {}).length, label: 'Categories', subtitle: 'Issue types' },
+      { icon: '📁', value: stats.totalProjects || 0, label: 'Total Projects', subtitle: 'Claude Code projects' },
+      { icon: '🧠', value: stats.projectsWithMemory || 0, label: 'With Memory', subtitle: 'Projects with MEMORY.md' },
+      { icon: '📄', value: stats.totalFiles || 0, label: 'Memory Files', subtitle: 'Across all projects' },
     ];
 
     statItems.forEach(stat => {
@@ -1004,229 +994,212 @@ async function renderLessonsPage() {
       statsContainer.appendChild(card);
     });
 
-    // Populate tech filter from stats
-    const techs = Object.keys(stats.byTech || {}).sort();
-    techs.forEach(tech => {
-      const option = document.createElement('option');
-      option.value = tech;
-      option.textContent = tech;
-      techFilter.appendChild(option);
-    });
-
-    // Render lessons
-    renderLessonsList(lessonsList, state.lessons);
-
-    // Setup filters
-    const filterLessons = () => {
-      const category = categoryFilter.value;
-      const tech = techFilter.value;
-      const search = searchInput.value.toLowerCase();
-
-      const filtered = state.lessons.filter(lesson => {
-        if (category && lesson.category !== category) return false;
-        if (tech && !lesson.tech?.includes(tech)) return false;
-        if (search) {
-          const searchable = [
-            lesson.lesson,
-            lesson.error,
-            lesson.failedAttempt,
-            lesson.resolution,
-            ...(lesson.tech || [])
-          ].join(' ').toLowerCase();
-          if (!searchable.includes(search)) return false;
-        }
-        return true;
-      });
-
-      renderLessonsList(lessonsList, filtered);
-    };
-
-    categoryFilter.addEventListener('change', filterLessons);
-    techFilter.addEventListener('change', filterLessons);
-    searchInput.addEventListener('input', filterLessons);
+    // Render project list in sidebar
+    renderMemoryProjectList(projectList, state.memoryProjects);
 
     main.innerHTML = '';
     main.appendChild(content);
+
+    // Setup search after DOM is ready
+    setupMemorySearch();
   } catch (error) {
     showError(main, error.message);
   }
 }
 
-function renderLessonsList(container, lessons) {
+function renderMemoryProjectList(container, projects) {
   container.innerHTML = '';
 
-  if (lessons.length === 0) {
+  if (projects.length === 0) {
     container.innerHTML = `
-      <div class="empty-state empty-state-centered">
-        <p>No lessons captured yet</p>
-        <p class="empty-state-hint">Use /learn to capture lessons from mistakes, or enable automatic detection</p>
+      <div class="empty-state-small">
+        <p>No projects with memory files found</p>
       </div>
     `;
     return;
   }
 
-  // Sort by timestamp descending (most recent first)
-  const sorted = [...lessons].sort((a, b) =>
-    new Date(b.timestamp) - new Date(a.timestamp)
-  );
+  projects.forEach(project => {
+    const item = document.createElement('div');
+    item.className = 'memory-project-item';
+    item.dataset.projectId = project.id;
 
-  sorted.forEach(lesson => {
-    const card = createLessonCard(lesson);
-    container.appendChild(card);
+    const modified = new Date(project.lastModified);
+    const relTime = getRelativeTime(modified);
+
+    item.innerHTML = `
+      <span class="memory-project-item-name">${escapeHtml(project.name)}</span>
+      <span class="memory-project-item-path">${escapeHtml(project.path)}</span>
+      <div class="memory-project-item-meta">
+        <span>${project.fileCount} file${project.fileCount !== 1 ? 's' : ''}</span>
+        <span>${relTime}</span>
+      </div>
+    `;
+
+    item.addEventListener('click', () => {
+      // Update selection
+      container.querySelectorAll('.memory-project-item').forEach(el => {
+        el.classList.remove('active');
+      });
+      item.classList.add('active');
+      loadProjectMemory(project.id, project.name);
+    });
+
+    container.appendChild(item);
   });
 }
 
-function createLessonCard(lesson) {
-  const card = templates.lessonCard.content.cloneNode(true);
-  const cardEl = card.querySelector('.lesson-card');
+async function loadProjectMemory(projectId, projectName) {
+  const contentArea = document.getElementById('memory-content');
+  if (!contentArea) return;
 
-  // Category badge
-  const categoryEl = card.querySelector('.lesson-category');
-  const categoryName = lesson.category?.replace(/-/g, ' ') || 'other';
-  categoryEl.textContent = categoryName;
-  categoryEl.classList.add(`category-${lesson.category || 'other'}`);
+  contentArea.innerHTML = `
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Loading memory...</p>
+    </div>
+  `;
 
-  // Date
-  const dateEl = card.querySelector('.lesson-date');
-  if (lesson.timestamp) {
-    const date = new Date(lesson.timestamp);
-    dateEl.textContent = date.toLocaleDateString();
-  }
+  try {
+    const { files } = await api(`/memory/project/${encodeURIComponent(projectId)}`);
 
-  // Lesson text
-  card.querySelector('.lesson-text').textContent = lesson.lesson || 'No description';
-
-  // Tech badges
-  const techContainer = card.querySelector('.lesson-tech');
-  (lesson.tech || []).forEach(tech => {
-    const badge = document.createElement('span');
-    badge.className = 'tech-badge';
-    badge.textContent = tech;
-    techContainer.appendChild(badge);
-  });
-
-  // Code blocks
-  const failedCodeEl = card.querySelector('.failed-code');
-  const fixedCodeEl = card.querySelector('.fixed-code');
-  const failedBlock = card.querySelector('.code-block.failed');
-  const fixedBlock = card.querySelector('.code-block.fixed');
-
-  if (lesson.failedAttempt) {
-    failedCodeEl.textContent = lesson.failedAttempt;
-  } else {
-    failedBlock.style.display = 'none';
-  }
-
-  if (lesson.resolution) {
-    fixedCodeEl.textContent = lesson.resolution;
-  } else {
-    fixedBlock.style.display = 'none';
-  }
-
-  // Error message
-  const errorEl = card.querySelector('.lesson-error');
-  if (lesson.error) {
-    errorEl.textContent = lesson.error;
-  } else {
-    errorEl.style.display = 'none';
-  }
-
-  // Hits
-  card.querySelector('.lesson-hits').textContent = `${lesson.hits || 0} hits`;
-
-  // Actions
-  const promoteBtn = card.querySelector('.promote-btn');
-  const deleteBtn = card.querySelector('.delete-btn');
-
-  promoteBtn.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    try {
-      promoteBtn.disabled = true;
-      promoteBtn.textContent = 'Promoting...';
-      const result = await api(`/lessons/${encodeURIComponent(lesson.id)}/promote`, { method: 'POST' });
-      promoteBtn.textContent = 'Promoted!';
-      setTimeout(() => {
-        promoteBtn.textContent = 'Promote to KB';
-        promoteBtn.disabled = false;
-      }, 2000);
-    } catch (error) {
-      promoteBtn.textContent = 'Error';
-      console.error('Failed to promote lesson:', error);
-      setTimeout(() => {
-        promoteBtn.textContent = 'Promote to KB';
-        promoteBtn.disabled = false;
-      }, 2000);
+    if (files.length === 0) {
+      contentArea.innerHTML = `
+        <div class="empty-state memory-empty">
+          <p>No memory files in this project</p>
+        </div>
+      `;
+      return;
     }
-  });
 
-  deleteBtn.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    if (!confirm('Delete this lesson?')) return;
+    let html = '';
+    for (const file of files) {
+      const modified = new Date(file.lastModified);
+      const sizeStr = file.size < 1024 ? `${file.size} B` : `${(file.size / 1024).toFixed(1)} KB`;
 
-    try {
-      await api(`/lessons/${encodeURIComponent(lesson.id)}`, { method: 'DELETE' });
-      cardEl.remove();
-      // Update state
-      state.lessons = state.lessons.filter(l => l.id !== lesson.id);
-    } catch (error) {
-      console.error('Failed to delete lesson:', error);
-      showToast('Failed to delete lesson', 'error');
+      html += `
+        <div class="memory-file-section">
+          <div class="memory-file-header">
+            <h3>${escapeHtml(file.name)}</h3>
+            <span class="memory-file-meta">${sizeStr} &middot; ${modified.toLocaleDateString()}</span>
+          </div>
+          <div class="markdown-body">${marked.parse(file.content)}</div>
+        </div>
+      `;
     }
-  });
 
-  // Click card to view details
-  cardEl.addEventListener('click', () => {
-    showLessonDetailModal(lesson);
-  });
-
-  return card;
+    contentArea.innerHTML = html;
+  } catch (error) {
+    contentArea.innerHTML = `<div class="empty-state"><p>Failed to load: ${escapeHtml(error.message)}</p></div>`;
+  }
 }
 
-function showLessonDetailModal(lesson) {
-  const modal = templates.detailModal.content.cloneNode(true);
+function setupMemorySearch() {
+  const searchInput = document.getElementById('memory-search-input');
+  const resultsContainer = document.getElementById('memory-search-results');
 
-  const categoryName = lesson.category?.replace(/-/g, ' ') || 'other';
-  modal.querySelector('.modal-title').textContent = `Lesson: ${categoryName}`;
+  if (!searchInput || !resultsContainer) return;
 
-  let md = `## ${lesson.lesson || 'Lesson Details'}\n\n`;
+  let searchTimeout = null;
 
-  if (lesson.tech?.length) {
-    md += `**Technologies:** ${lesson.tech.join(', ')}\n\n`;
+  searchInput.addEventListener('input', (e) => {
+    const query = e.target.value.trim();
+
+    if (query.length < 2) {
+      resultsContainer.innerHTML = '';
+      resultsContainer.classList.remove('visible');
+      return;
+    }
+
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(async () => {
+      try {
+        const { results } = await api(`/memory/search?q=${encodeURIComponent(query)}`);
+        renderMemorySearchResults(results, resultsContainer);
+      } catch (error) {
+        resultsContainer.innerHTML = '<div class="search-error">Search failed</div>';
+        resultsContainer.classList.add('visible');
+      }
+    }, 200);
+  });
+
+  searchInput.addEventListener('focus', () => {
+    if (searchInput.value.trim().length >= 2) {
+      searchInput.dispatchEvent(new Event('input'));
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.memory-search')) {
+      resultsContainer.classList.remove('visible');
+    }
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      resultsContainer.classList.remove('visible');
+      searchInput.blur();
+    }
+  });
+}
+
+function renderMemorySearchResults(results, container) {
+  if (results.length === 0) {
+    container.innerHTML = '<div class="search-empty">No results found</div>';
+    container.classList.add('visible');
+    return;
   }
 
-  if (lesson.file) {
-    md += `**File:** \`${lesson.file}\`\n\n`;
-  }
+  let html = '';
+  results.forEach(result => {
+    html += `
+      <div class="memory-search-result" data-project-id="${escapeHtml(result.projectId)}" data-project-name="${escapeHtml(result.projectName)}">
+        <div class="memory-search-result-project">${escapeHtml(result.projectName)}</div>
+        <div class="memory-search-result-file">${escapeHtml(result.file)}</div>
+        <div class="memory-search-result-snippet">${escapeHtml(result.snippet)}</div>
+      </div>
+    `;
+  });
 
-  if (lesson.failedAttempt) {
-    md += `### Failed Approach\n\n\`\`\`\n${lesson.failedAttempt}\n\`\`\`\n\n`;
-  }
+  container.innerHTML = html;
+  container.classList.add('visible');
 
-  if (lesson.error) {
-    md += `### Error\n\n${lesson.error}\n\n`;
-  }
+  // Add click handlers to navigate to the project
+  container.querySelectorAll('.memory-search-result').forEach(el => {
+    el.addEventListener('click', () => {
+      const projectId = el.dataset.projectId;
+      const projectName = el.dataset.projectName;
 
-  if (lesson.resolution) {
-    md += `### Resolution\n\n\`\`\`\n${lesson.resolution}\n\`\`\`\n\n`;
-  }
+      // Highlight the project in the sidebar
+      const projectList = document.getElementById('memory-project-list');
+      if (projectList) {
+        projectList.querySelectorAll('.memory-project-item').forEach(item => {
+          item.classList.toggle('active', item.dataset.projectId === projectId);
+        });
+      }
 
-  md += `---\n\n`;
-  md += `**Hits:** ${lesson.hits || 0} | `;
-  md += `**Trigger:** ${lesson.trigger || 'manual'} | `;
-  md += `**Added:** ${lesson.timestamp ? new Date(lesson.timestamp).toLocaleString() : 'Unknown'}`;
+      loadProjectMemory(projectId, projectName);
 
-  modal.querySelector('.modal-body').innerHTML = marked.parse(md);
+      const searchInput = document.getElementById('memory-search-input');
+      if (searchInput) searchInput.value = '';
+      container.classList.remove('visible');
+    });
+  });
+}
 
-  const closeModal = () => {
-    document.body.removeChild(state.modal);
-    state.modal = null;
-  };
+function getRelativeTime(date) {
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
 
-  modal.querySelector('.modal-close').addEventListener('click', closeModal);
-  modal.querySelector('.modal-backdrop').addEventListener('click', closeModal);
-
-  document.body.appendChild(modal);
-  state.modal = document.body.lastElementChild;
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
 }
 
 // Settings Page - State tracking for view mode

@@ -19,7 +19,6 @@
     "./lib/agent-parser.js",
     "./lib/api-handlers.js",
     "./lib/config-reader.js",
-    "./lib/lessons-reader.js",
     "./lib/mcp-reader.js",
     "./lib/memory-reader.js",
     "./lib/plugin-reader.js",

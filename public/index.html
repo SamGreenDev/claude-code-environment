@@ -37,7 +37,7 @@
           <a href="#/rules" class="nav-link" data-route="rules">Rules</a>
           <a href="#/plugins" class="nav-link" data-route="plugins">Plugins</a>
           <a href="#/mcp-servers" class="nav-link" data-route="mcp-servers">MCP Servers</a>
-          <a href="#/lessons" class="nav-link" data-route="lessons">Lessons</a>
+          <a href="#/memory" class="nav-link" data-route="memory">Memory</a>
           <a href="#/settings" class="nav-link" data-route="settings">Settings</a>
         </nav>
         <button class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
@@ -356,74 +356,40 @@
     </div>
   </template>
 
-  <template id="lessons-template">
+  <template id="memory-template">
     <div class="page-container">
       <div class="page-header">
-        <h1>Lessons Learned</h1>
-        <p class="subtitle">Claude's self-corrections and learned patterns</p>
+        <h1>Auto-Memory</h1>
+        <p class="subtitle">Per-project MEMORY.md files managed by Claude Code</p>
       </div>
-      <div class="lessons-stats" id="lessons-stats">
+      <div class="memory-stats" id="memory-stats">
         <!-- Stats cards -->
       </div>
-      <div class="lessons-filters">
-        <div class="filter-group">
-          <label for="category-filter">Category</label>
-          <select id="category-filter" class="filter-select">
-            <option value="">All Categories</option>
-            <option value="async-patterns">Async Patterns</option>
-            <option value="type-errors">Type Errors</option>
-            <option value="api-misuse">API Misuse</option>
-            <option value="syntax">Syntax</option>
-            <option value="logic">Logic</option>
-            <option value="imports">Imports</option>
-            <option value="patterns">Patterns</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label for="tech-filter">Technology</label>
-          <select id="tech-filter" class="filter-select">
-            <option value="">All Tech</option>
-          </select>
-        </div>
-        <div class="filter-group search-group">
-          <label for="lessons-search">Search</label>
-          <input type="text" id="lessons-search" class="filter-input" placeholder="Search lessons..." />
-        </div>
-      </div>
-      <div class="lessons-list" id="lessons-list">
-        <!-- Lesson cards -->
-      </div>
-    </div>
-  </template>
-
-  <template id="lesson-card-template">
-    <div class="lesson-card">
-      <div class="lesson-header">
-        <span class="lesson-category"></span>
-        <span class="lesson-date"></span>
-      </div>
-      <div class="lesson-content">
-        <p class="lesson-text"></p>
-        <div class="lesson-tech"></div>
-      </div>
-      <div class="lesson-code">
-        <div class="code-block failed">
-          <span class="code-label">Failed</span>
-          <code class="failed-code"></code>
-        </div>
-        <div class="code-block fixed">
-          <span class="code-label">Fixed</span>
-          <code class="fixed-code"></code>
-        </div>
-      </div>
-      <div class="lesson-error"></div>
-      <div class="lesson-footer">
-        <span class="lesson-hits"></span>
-        <div class="lesson-actions">
-          <button class="btn btn-secondary btn-sm promote-btn">Promote to KB</button>
-          <button class="btn btn-danger btn-sm delete-btn">Delete</button>
-        </div>
+      <div class="memory-layout">
+        <aside class="memory-sidebar">
+          <div class="memory-search">
+            <div class="search-container">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input type="text" id="memory-search-input" placeholder="Search across projects..." autocomplete="off" />
+            </div>
+            <div id="memory-search-results" class="memory-search-results"></div>
+          </div>
+          <div class="memory-project-list" id="memory-project-list">
+            <!-- Project items -->
+          </div>
+        </aside>
+        <main class="memory-content" id="memory-content">
+          <div class="empty-state memory-empty">
+            <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+            </svg>
+            <h3>Auto-Memory</h3>
+            <p>Select a project from the sidebar to view its memory files, or use search to find content across all projects.</p>
+          </div>
+        </main>
       </div>
     </div>
   </template>

@@ -173,7 +173,6 @@ server.listen(PORT, () => {
   - Commands:     http://localhost:${PORT}/#/commands
   - Knowledge:    http://localhost:${PORT}/#/knowledge
   - Memory:       http://localhost:${PORT}/#/memory
-  - Lessons:      http://localhost:${PORT}/#/lessons
   - Settings:     http://localhost:${PORT}/#/settings
 
   WebSocket:      ws://localhost:${PORT}/ws/activity
