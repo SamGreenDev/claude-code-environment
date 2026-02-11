@@ -176,6 +176,21 @@ class JediArchives {
 
     // Recalculate terminal positions based on canvas size and agent count
     this.calculateTerminalPositions(this.agents ? this.agents.size : 0);
+
+    // Snap agents to recalculated terminal positions
+    if (this.agents && this.agents.size > 0) {
+      this.agents.forEach(agent => {
+        const terminal = TERMINAL_POSITIONS[agent.terminalIndex];
+        if (terminal) {
+          agent.targetX = terminal.x;
+          agent.targetY = terminal.y;
+          if (agent._arrived || agent.status === 'working') {
+            agent.currentX = terminal.x;
+            agent.currentY = terminal.y;
+          }
+        }
+      });
+    }
   }
 
   calculateTerminalPositions(agentCount) {
@@ -184,9 +199,12 @@ class JediArchives {
     const usableWidth = this.width - (margin * 2);
     const spacing = usableWidth / (COLS - 1);
 
-    // Distribute rows evenly between 20% and 85% of canvas height
-    const topFraction = 0.20;
-    const bottomFraction = 0.85;
+    // Dynamic top with minimum clearance for thought bubbles above agents
+    const HEADER_HEIGHT = 52;
+    const BUBBLE_HEADROOM = 130;
+    const minTopY = HEADER_HEIGHT + BUBBLE_HEADROOM;
+    const topFraction = Math.max(minTopY / this.height, 0.28);
+    const bottomFraction = 0.75;
 
     const newPositions = [];
     for (let row = 0; row < rows; row++) {
@@ -942,6 +960,7 @@ class JediArchives {
 
   drawSpeechBubble(agent) {
     const ctx = this.ctx;
+    const config = JEDI_CONFIGS[agent.jediClass] || JEDI_CONFIGS.padawan;
     const dense = this.agents.size > 6;
     const padding = dense ? 6 : 10;
     const maxBubbleWidth = dense ? 160 : 200;
@@ -956,7 +975,8 @@ class JediArchives {
     }
 
     // Wrap text into lines
-    ctx.font = `${dense ? 10 : 11}px "JetBrains Mono", monospace`;
+    const bodyFontSize = dense ? 10 : 11;
+    ctx.font = `${bodyFontSize}px "JetBrains Mono", monospace`;
     const maxTextWidth = maxBubbleWidth - padding * 2;
     let lines = this.wrapText(ctx, text, maxTextWidth);
     if (lines.length > maxLines) {
@@ -964,21 +984,30 @@ class JediArchives {
       lines[maxLines - 1] = lines[maxLines - 1].substring(0, lines[maxLines - 1].length - 3) + '...';
     }
 
-    // Calculate bubble dimensions
-    let widestLine = 0;
+    // Measure header line width too
+    const headerFontSize = dense ? 9 : 10;
+    ctx.font = `bold ${headerFontSize}px "JetBrains Mono", monospace`;
+    const headerWidth = ctx.measureText(config.name).width;
+
+    // Calculate bubble dimensions (extra lineHeight for header)
+    ctx.font = `${bodyFontSize}px "JetBrains Mono", monospace`;
+    let widestLine = headerWidth;
     for (const line of lines) {
       const w = ctx.measureText(line).width;
       if (w > widestLine) widestLine = w;
     }
     const bubbleWidth = Math.min(widestLine + padding * 2, maxBubbleWidth);
-    const bubbleHeight = lines.length * lineHeight + padding * 2;
+    const bubbleHeight = (lines.length + 1) * lineHeight + padding * 2;
 
     const x = agent.currentX;
-    const bubbleOffset = dense ? 90 : 110;
+    const bubbleOffset = dense ? 95 : 115;
     const y = agent.currentY - bubbleOffset - (bubbleHeight - 24) / 2;
 
     const bubbleX = x - bubbleWidth / 2;
-    const bubbleY = y - bubbleHeight / 2;
+    let bubbleY = y - bubbleHeight / 2;
+
+    // Clamp: never overlap header
+    if (bubbleY < 56) bubbleY = 56;
 
     // Bubble glow
     ctx.shadowColor = COLORS.holocronGlow;
@@ -1005,20 +1034,21 @@ class JediArchives {
     ctx.fill();
     ctx.stroke();
 
-    // Draw wrapped text lines
-    ctx.fillStyle = COLORS.textGlow;
+    // Draw header (class name) in accent color
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const textStartY = bubbleY + padding + lineHeight / 2;
+    ctx.fillStyle = config.accentColor;
+    ctx.font = `bold ${headerFontSize}px "JetBrains Mono", monospace`;
+    const headerY = bubbleY + padding + lineHeight / 2;
+    ctx.fillText(config.name, x, headerY);
+
+    // Draw wrapped text lines below header
+    ctx.fillStyle = COLORS.textGlow;
+    ctx.font = `${bodyFontSize}px "JetBrains Mono", monospace`;
+    const textStartY = headerY + lineHeight;
     for (let i = 0; i < lines.length; i++) {
       ctx.fillText(lines[i], x, textStartY + i * lineHeight);
     }
-
-    // Jedi class indicator
-    const config = JEDI_CONFIGS[agent.jediClass] || JEDI_CONFIGS.padawan;
-    ctx.fillStyle = config.accentColor;
-    ctx.font = '9px "JetBrains Mono", monospace';
-    ctx.fillText(config.name, x, bubbleY + bubbleHeight + 18);
   }
 
   roundRect(x, y, w, h, r) {
