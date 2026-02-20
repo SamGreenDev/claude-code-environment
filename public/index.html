@@ -33,11 +33,13 @@
           <a href="#/agents" class="nav-link" data-route="agents">Agents</a>
           <a href="#/skills" class="nav-link" data-route="skills">Skills</a>
           <a href="#/commands" class="nav-link" data-route="commands">Commands</a>
-          <a href="#/knowledge" class="nav-link" data-route="knowledge">Knowledge</a>
           <a href="#/rules" class="nav-link" data-route="rules">Rules</a>
           <a href="#/plugins" class="nav-link" data-route="plugins">Plugins</a>
           <a href="#/mcp-servers" class="nav-link" data-route="mcp-servers">MCP Servers</a>
           <a href="#/memory" class="nav-link" data-route="memory">Memory</a>
+          <a href="#/mission-builder" class="nav-link nav-link-missions" data-route="mission-builder">Missions</a>
+          <a href="#/holonet" class="nav-link nav-link-holonet" data-route="holonet">Holonet</a>
+          <a href="#/comms" class="nav-link nav-link-comms" data-route="comms">Comms</a>
           <a href="#/settings" class="nav-link" data-route="settings">Settings</a>
         </nav>
         <button class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
@@ -98,10 +100,6 @@
             <a href="#/plugins" class="action-card">
               <span class="action-icon">🔌</span>
               <span class="action-label">View Plugins</span>
-            </a>
-            <a href="#/knowledge" class="action-card">
-              <span class="action-icon">📚</span>
-              <span class="action-label">Knowledge Base</span>
             </a>
             <a href="#/mcp-servers" class="action-card">
               <span class="action-icon">🖥️</span>
@@ -274,39 +272,6 @@
         <div class="plugin-links">
           <a class="btn btn-secondary plugin-homepage" target="_blank">View Homepage</a>
         </div>
-      </div>
-    </div>
-  </template>
-
-  <template id="knowledge-template">
-    <div class="page-container">
-      <div class="page-header">
-        <h1>Knowledge Base</h1>
-        <p class="subtitle">Technology knowledge and learned practices</p>
-      </div>
-      <div class="knowledge-layout">
-        <aside class="knowledge-sidebar">
-          <div class="knowledge-search">
-            <div class="search-container">
-              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              <input type="text" id="knowledge-search-input" placeholder="Search files..." autocomplete="off" />
-            </div>
-            <div id="knowledge-search-results" class="knowledge-search-results"></div>
-          </div>
-          <div class="tree-container" id="knowledge-tree"></div>
-        </aside>
-        <main class="knowledge-content" id="knowledge-content">
-          <div class="empty-state knowledge-empty">
-            <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-            </svg>
-            <h3>Knowledge Base</h3>
-            <p>Select a file from the tree to view its contents, or use the search to find specific topics.</p>
-          </div>
-        </main>
       </div>
     </div>
   </template>
@@ -508,6 +473,24 @@
     </div>
   </template>
 
+  <template id="mission-builder-template">
+    <div class="page-container mission-builder-page">
+      <div id="mission-builder-container" class="mission-builder-container"></div>
+    </div>
+  </template>
+
+  <template id="holonet-template">
+    <div class="page-container holonet-page">
+      <div id="holonet-container" class="holonet-container"></div>
+    </div>
+  </template>
+
+  <template id="comms-template">
+    <div class="page-container comms-page">
+      <div id="comms-container" class="comms-container"></div>
+    </div>
+  </template>
+
   <template id="error-template">
     <div class="error-container">
       <div class="error-icon">⚠️</div>
@@ -518,7 +501,12 @@
   </template>
 
   <script src="/vendor/marked.min.js"></script>
+  <script src="/vendor/leader-line.min.js"></script>
   <script src="/jedi-archives.js"></script>
+  <script src="/faction-data.js"></script>
+  <script src="/mission-builder.js"></script>
+  <script src="/holonet-command.js"></script>
+  <script src="/comms-log.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

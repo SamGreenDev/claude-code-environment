@@ -20,6 +20,9 @@ dist/
 .agent-state.json
 .session-state.json
 
+# Claude Code local config
+.claude/
+
 # Temporary deployment docs
 DEPLOYMENT_INSTRUCTIONS.md
 DEPLOY_NOW.md

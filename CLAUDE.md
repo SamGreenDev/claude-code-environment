@@ -98,6 +98,15 @@ claude-dev
 - **Fonts**: JetBrains Mono (mono), IBM Plex Sans (sans)
 - **Visualization**: Canvas-based Jedi Archives with pixel art agents
 
+### Jedi Archives UI Constraints
+
+**CRITICAL**: Speech bubbles must NEVER overlap the header area:
+- Header ends at y=52px (architectural detail line)
+- Speech bubbles must have top edge >= 60px minimum
+- When positioning bubbles, check `bubbleY < 60` and clamp to safe zone
+- Reduce bubble width and max lines when `agents.size > 4` for density
+- Speech bubble connector should point to Jedi, not overlap them
+
 ## Skills
 
 | Skill | Command | Purpose |

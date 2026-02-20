@@ -16,6 +16,7 @@ import { registerApiRoutes } from './lib/api-handlers.js';
 import { initWebSocket, registerActivityRoutes, shutdown as shutdownActivity } from './lib/activity-handler.js';
 import { registerSessionRoutes, addSessionClient, startHeartbeatChecker } from './lib/session-handler.js';
 import { startTeamWatcher } from './lib/team-watcher.js';
+import { registerMissionRoutes, handleMissionUpgrade, getMissionWss } from './lib/mission-api-handler.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, 'public');
@@ -112,6 +113,7 @@ const router = createRouter();
 registerApiRoutes(router);
 registerActivityRoutes(router);
 registerSessionRoutes(router);
+registerMissionRoutes(router);
 
 // Parse URL query string helper
 function parseQuery(url) {
@@ -154,7 +156,11 @@ const server = createServer(async (req, res) => {
 // Start server
 server.listen(PORT, () => {
   // Initialize WebSocket for activity and session updates
-  initWebSocket(server, { onSessionConnection: addSessionClient });
+  initWebSocket(server, {
+    onSessionConnection: addSessionClient,
+    onMissionUpgrade: handleMissionUpgrade,
+  });
+  getMissionWss(); // Initialize mission WebSocket and engine event subscriptions
   startHeartbeatChecker();
   startTeamWatcher();
 
@@ -171,12 +177,12 @@ server.listen(PORT, () => {
   - Agents:       http://localhost:${PORT}/#/agents
   - Skills:       http://localhost:${PORT}/#/skills
   - Commands:     http://localhost:${PORT}/#/commands
-  - Knowledge:    http://localhost:${PORT}/#/knowledge
   - Memory:       http://localhost:${PORT}/#/memory
   - Settings:     http://localhost:${PORT}/#/settings
 
   WebSocket:      ws://localhost:${PORT}/ws/activity
   Sessions WS:    ws://localhost:${PORT}/ws/sessions
+  Missions WS:    ws://localhost:${PORT}/ws/missions
 
   Auto-shutdown after 30 minutes of inactivity.
   Press Ctrl+C to stop.

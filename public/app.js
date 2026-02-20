@@ -97,7 +97,6 @@ const templates = {
   ruleCard: document.getElementById('rule-card-template'),
   plugins: document.getElementById('plugins-template'),
   pluginItem: document.getElementById('plugin-item-template'),
-  knowledge: document.getElementById('knowledge-template'),
   mcpServers: document.getElementById('mcp-servers-template'),
   mcpServerCard: document.getElementById('mcp-server-card-template'),
   memory: document.getElementById('memory-template'),
@@ -107,6 +106,9 @@ const templates = {
   envSelect: document.getElementById('env-select-template'),
   detailModal: document.getElementById('detail-modal-template'),
   error: document.getElementById('error-template'),
+  missionBuilder: document.getElementById('mission-builder-template'),
+  holonet: document.getElementById('holonet-template'),
+  comms: document.getElementById('comms-template'),
 };
 
 // State
@@ -118,13 +120,15 @@ const state = {
   rules: [],
   plugins: [],
   mcpServers: [],
-  knowledge: null,
   groupedHooks: null,
   memoryProjects: [],
   memoryStats: null,
   currentRoute: '',
   modal: null,
   jediArchives: null, // Jedi Archives canvas instance
+  missionBuilder: null, // Mission Builder instance
+  holonetCommand: null, // Holonet Command Center instance
+  commsLog: null, // Comms Log instance
 };
 
 // API helpers
@@ -161,7 +165,8 @@ function initRouter() {
 }
 
 function handleRoute() {
-  const hash = window.location.hash.slice(1) || '/';
+  const rawHash = window.location.hash.slice(1) || '/';
+  const hash = rawHash.split('?')[0]; // Strip query params before routing
   const [path, ...rest] = hash.split('/').filter(Boolean);
 
   // Update active nav link (no nav link for dashboard since it's accessed via logo)
@@ -177,6 +182,21 @@ function handleRoute() {
   if (path !== 'activity' && state.jediArchives) {
     state.jediArchives.destroy();
     state.jediArchives = null;
+  }
+  // Clean up Mission Builder when navigating away
+  if (path !== 'mission-builder' && state.missionBuilder) {
+    state.missionBuilder.destroy();
+    state.missionBuilder = null;
+  }
+  // Clean up Holonet Command when navigating away
+  if (path !== 'holonet' && state.holonetCommand) {
+    state.holonetCommand.destroy();
+    state.holonetCommand = null;
+  }
+  // Clean up Comms Log when navigating away
+  if (path !== 'comms' && state.commsLog) {
+    state.commsLog.destroy();
+    state.commsLog = null;
   }
 
   switch (path) {
@@ -201,14 +221,20 @@ function handleRoute() {
     case 'mcp-servers':
       renderMCPServersPage();
       break;
-    case 'knowledge':
-      renderKnowledgePage(rest.join('/'));
-      break;
     case 'memory':
       renderMemoryPage();
       break;
     case 'settings':
       renderSettingsPage();
+      break;
+    case 'mission-builder':
+      renderMissionBuilderPage();
+      break;
+    case 'holonet':
+      renderHolonetPage(rest.join('/'));
+      break;
+    case 'comms':
+      renderCommsPage();
       break;
     default:
       renderDashboard();
@@ -232,7 +258,6 @@ async function renderDashboard() {
       { icon: '🤖', value: overview.agents, label: 'Agents' },
       { icon: '⚡', value: overview.skills, label: 'Skills' },
       { icon: '📝', value: overview.commands, label: 'Commands' },
-      { icon: '📚', value: overview.knowledge, label: 'Knowledge Files' },
       { icon: '📏', value: overview.rules, label: 'Rules' },
       { icon: '🔌', value: overview.plugins || 0, label: 'Plugins' },
       { icon: '🖥️', value: overview.mcpServers || 0, label: 'MCP Servers' },
@@ -731,238 +756,6 @@ const TREE_ICONS = {
   fileMarkdown: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 2l5 5h-5V4zm-3 11.5L7 12v3H5v-6h2v3l3-3 3 3v-3h2v6h-2v-3l-3 3.5z"/></svg>',
   fileDefault: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>'
 };
-
-// Knowledge Page
-async function renderKnowledgePage(filePath = '') {
-  const main = document.getElementById('main-content');
-  showLoading(main);
-
-  try {
-    const { structure } = await api('/knowledge');
-    state.knowledge = structure;
-
-    const content = templates.knowledge.content.cloneNode(true);
-    const treeContainer = content.getElementById('knowledge-tree');
-    const contentArea = content.getElementById('knowledge-content');
-
-    renderKnowledgeTree(treeContainer, structure, filePath);
-
-    if (filePath) {
-      await loadKnowledgeFile(contentArea, filePath);
-    }
-
-    main.innerHTML = '';
-    main.appendChild(content);
-
-    // Setup search after DOM is ready
-    setupKnowledgeSearch();
-  } catch (error) {
-    showError(main, error.message);
-  }
-}
-
-/**
- * Render knowledge tree recursively (VS Code style)
- */
-function renderKnowledgeTree(container, items, activePath, level = 0) {
-  container.innerHTML = '';
-
-  items.forEach(item => {
-    const itemEl = document.createElement('div');
-    itemEl.className = 'tree-item';
-    itemEl.dataset.level = level;
-    itemEl.style.setProperty('--level', level);
-
-    if (item.type === 'directory') {
-      // Folder item
-      const rowEl = document.createElement('div');
-      rowEl.className = 'tree-row folder';
-      rowEl.innerHTML = `
-        <span class="tree-toggle">${TREE_ICONS.chevron}</span>
-        <span class="tree-icon folder-closed">${TREE_ICONS.folderClosed}</span>
-        <span class="tree-label">${item.name}</span>
-      `;
-
-      const childContainer = document.createElement('div');
-      childContainer.className = 'tree-children';
-
-      if (item.children && item.children.length > 0) {
-        renderKnowledgeTree(childContainer, item.children, activePath, level + 1);
-      }
-
-      rowEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        itemEl.classList.toggle('expanded');
-        const iconEl = rowEl.querySelector('.tree-icon');
-        if (itemEl.classList.contains('expanded')) {
-          iconEl.className = 'tree-icon folder-open';
-          iconEl.innerHTML = TREE_ICONS.folderOpen;
-        } else {
-          iconEl.className = 'tree-icon folder-closed';
-          iconEl.innerHTML = TREE_ICONS.folderClosed;
-        }
-      });
-
-      itemEl.appendChild(rowEl);
-      itemEl.appendChild(childContainer);
-
-      // Auto-expand if active path is inside
-      if (activePath && activePath.startsWith(item.path + '/')) {
-        itemEl.classList.add('expanded');
-        const iconEl = rowEl.querySelector('.tree-icon');
-        iconEl.className = 'tree-icon folder-open';
-        iconEl.innerHTML = TREE_ICONS.folderOpen;
-      }
-    } else {
-      // File item
-      const rowEl = document.createElement('div');
-      rowEl.className = 'tree-row';
-      if (activePath === item.path) {
-        rowEl.classList.add('selected');
-      }
-
-      const isMarkdown = item.name.endsWith('.md');
-      const iconClass = isMarkdown ? 'file-markdown' : 'file-default';
-      const iconSvg = isMarkdown ? TREE_ICONS.fileMarkdown : TREE_ICONS.fileDefault;
-
-      rowEl.innerHTML = `
-        <span class="tree-toggle-placeholder"></span>
-        <span class="tree-icon ${iconClass}">${iconSvg}</span>
-        <span class="tree-label">${item.name.replace('.md', '')}</span>
-      `;
-
-      rowEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // Update selection
-        document.querySelectorAll('.tree-row.selected').forEach(el => {
-          el.classList.remove('selected');
-        });
-        rowEl.classList.add('selected');
-        window.location.hash = `/knowledge/${item.path}`;
-      });
-
-      itemEl.appendChild(rowEl);
-    }
-
-    container.appendChild(itemEl);
-  });
-}
-
-/**
- * Setup knowledge search listeners
- */
-function setupKnowledgeSearch() {
-  const searchInput = document.getElementById('knowledge-search-input');
-  const resultsContainer = document.getElementById('knowledge-search-results');
-
-  if (!searchInput || !resultsContainer) return;
-
-  let searchTimeout = null;
-
-  searchInput.addEventListener('input', (e) => {
-    const query = e.target.value.trim();
-
-    if (query.length < 2) {
-      resultsContainer.innerHTML = '';
-      resultsContainer.classList.remove('visible');
-      return;
-    }
-
-    // Debounce search
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(async () => {
-      await handleKnowledgeSearch(query, resultsContainer);
-    }, 200);
-  });
-
-  searchInput.addEventListener('focus', () => {
-    if (searchInput.value.trim().length >= 2) {
-      handleKnowledgeSearch(searchInput.value, resultsContainer);
-    }
-  });
-
-  // Close search results when clicking outside
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.knowledge-search')) {
-      resultsContainer.classList.remove('visible');
-    }
-  });
-
-  // Handle escape key
-  searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      searchInput.value = '';
-      resultsContainer.classList.remove('visible');
-      searchInput.blur();
-    }
-  });
-}
-
-/**
- * Handle knowledge search with debounce
- */
-async function handleKnowledgeSearch(query, container) {
-  try {
-    const { results } = await api(`/knowledge/search?q=${encodeURIComponent(query)}`);
-    renderKnowledgeSearchResults(results, container);
-  } catch (error) {
-    console.error('Knowledge search failed:', error);
-    container.innerHTML = '<div class="search-error">Search failed</div>';
-    container.classList.add('visible');
-  }
-}
-
-/**
- * Render knowledge search results
- */
-function renderKnowledgeSearchResults(results, container) {
-  if (results.length === 0) {
-    container.innerHTML = '<div class="search-empty">No results found</div>';
-    container.classList.add('visible');
-    return;
-  }
-
-  let html = '';
-  results.forEach(result => {
-    const href = `#/knowledge/${result.path}`;
-    html += `
-      <a href="${href}" class="knowledge-search-result">
-        <div class="search-result-name">${result.match}</div>
-        ${result.category ? `<div class="search-result-category">${result.category}</div>` : ''}
-        ${result.matchType === 'content' ? `<div class="search-result-preview">${result.match}</div>` : ''}
-      </a>
-    `;
-  });
-
-  container.innerHTML = html;
-  container.classList.add('visible');
-
-  // Add click handlers to close search and clear input
-  container.querySelectorAll('a').forEach(link => {
-    link.addEventListener('click', () => {
-      const searchInput = document.getElementById('knowledge-search-input');
-      if (searchInput) searchInput.value = '';
-      container.classList.remove('visible');
-    });
-  });
-}
-
-async function loadKnowledgeFile(container, filePath) {
-  try {
-    const { content } = await api(`/knowledge/file/${encodeURIComponent(filePath)}`);
-    container.innerHTML = `<div class="markdown-body">${marked.parse(content)}</div>`;
-
-    // Highlight "Official Documentation" headings
-    container.querySelectorAll('h2').forEach(h2 => {
-      if (h2.textContent.toLowerCase().includes('official documentation')) {
-        h2.classList.add('official-docs-heading');
-      }
-    });
-  } catch (error) {
-    container.innerHTML = `<div class="empty-state"><p>Failed to load file: ${escapeHtml(error.message)}</p></div>`;
-  }
-}
-
 
 // Memory Page
 async function renderMemoryPage() {
@@ -1771,6 +1564,66 @@ function showError(container, message) {
   content.querySelector('.error-message').textContent = message;
   container.innerHTML = '';
   container.appendChild(content);
+}
+
+// ============================================================
+// Mission Builder Page
+// ============================================================
+function renderMissionBuilderPage() {
+  const main = document.getElementById('main-content');
+  const content = templates.missionBuilder.content.cloneNode(true);
+  main.innerHTML = '';
+  main.appendChild(content);
+
+  requestAnimationFrame(() => {
+    if (window.MissionBuilder) {
+      state.missionBuilder = new window.MissionBuilder('mission-builder-container');
+    }
+  });
+}
+
+// ============================================================
+// Holonet Command Center Page
+// ============================================================
+function renderHolonetPage(params) {
+  const main = document.getElementById('main-content');
+  const content = templates.holonet.content.cloneNode(true);
+  main.innerHTML = '';
+  main.appendChild(content);
+
+  requestAnimationFrame(() => {
+    if (window.HolonetCommand) {
+      state.holonetCommand = new window.HolonetCommand('holonet-container');
+      // Check for URL params like #/holonet?run=xxx or #/holonet?mission=xxx
+      const hashParts = window.location.hash.split('?');
+      if (hashParts[1]) {
+        const urlParams = new URLSearchParams(hashParts[1]);
+        const runId = urlParams.get('run');
+        const missionId = urlParams.get('mission');
+        if (runId) {
+          state.holonetCommand.loadRun(runId);
+        } else if (missionId) {
+          state.holonetCommand.loadMission(missionId);
+        }
+      }
+    }
+  });
+}
+
+// ============================================================
+// Comms Log Page
+// ============================================================
+function renderCommsPage() {
+  const main = document.getElementById('main-content');
+  const content = templates.comms.content.cloneNode(true);
+  main.innerHTML = '';
+  main.appendChild(content);
+
+  requestAnimationFrame(() => {
+    if (window.CommsLog) {
+      state.commsLog = new window.CommsLog('comms-container');
+    }
+  });
 }
 
 // Initialize

@@ -342,6 +342,14 @@ body::after {
   width: 100%;
 }
 
+/* Full-width override for mission builder, holonet, and comms pages */
+.main:has(.mission-builder-page),
+.main:has(.holonet-page),
+.main:has(.comms-page) {
+  max-width: 100%;
+  padding: 0;
+}
+
 /* Footer */
 .footer {
   background: var(--bg-secondary);
@@ -1023,111 +1031,6 @@ body::after {
   color: var(--text-primary);
 }
 
-/* Knowledge Layout */
-.knowledge-layout {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: var(--space-xl);
-  min-height: 500px;
-}
-
-.knowledge-sidebar {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: var(--space-md);
-  overflow-y: auto;
-  max-height: calc(100vh - 200px);
-}
-
-.knowledge-content {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: var(--space-lg);
-  overflow-y: auto;
-  max-height: calc(100vh - 200px);
-}
-
-/* Knowledge Search */
-.knowledge-search {
-  position: relative;
-  margin-bottom: var(--space-md);
-}
-
-.knowledge-search .search-container {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.knowledge-search .search-icon {
-  position: absolute;
-  left: 10px;
-  width: 16px;
-  height: 16px;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-
-#knowledge-search-input {
-  width: 100%;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  padding: var(--space-sm) var(--space-sm) var(--space-sm) 34px;
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  transition: all var(--transition-fast);
-}
-
-#knowledge-search-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(199, 70, 52, 0.2);
-}
-
-#knowledge-search-input::placeholder {
-  color: var(--text-muted);
-}
-
-.knowledge-search-results {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  margin-top: 4px;
-  max-height: 300px;
-  overflow-y: auto;
-  z-index: 100;
-  box-shadow: var(--shadow-md);
-  display: none;
-}
-
-.knowledge-search-results.visible {
-  display: block;
-}
-
-.knowledge-search-result {
-  display: block;
-  padding: var(--space-sm) var(--space-md);
-  text-decoration: none;
-  color: var(--text-primary);
-  border-bottom: 1px solid var(--border-subtle);
-  transition: background var(--transition-fast);
-}
-
-.knowledge-search-result:hover {
-  background: var(--bg-hover);
-}
-
-.knowledge-search-result:last-child {
-  border-bottom: none;
-}
-
 .search-result-name {
   font-weight: 500;
   margin-bottom: 2px;
@@ -1308,31 +1211,6 @@ body::after {
 
 .tree-item-icon {
   font-size: 1rem;
-}
-
-/* Empty State */
-.knowledge-empty {
-  padding: var(--space-2xl);
-}
-
-.knowledge-empty .empty-icon {
-  width: 64px;
-  height: 64px;
-  color: var(--text-muted);
-  margin-bottom: var(--space-md);
-}
-
-.knowledge-empty h3 {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: var(--space-sm);
-}
-
-.knowledge-empty p {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-  max-width: 300px;
 }
 
 /* Empty State */
@@ -3163,7 +3041,7 @@ body::after {
   margin-bottom: var(--space-xl);
 }
 
-/* Memory Layout (sidebar + content, same as knowledge) */
+/* Memory Layout (sidebar + content) */
 .memory-layout {
   display: grid;
   grid-template-columns: 280px 1fr;
@@ -3411,14 +3289,6 @@ body::after {
 
   .main {
     padding: var(--space-md);
-  }
-
-  .knowledge-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .knowledge-sidebar {
-    max-height: 300px;
   }
 
   .memory-layout {
@@ -3734,4 +3604,79 @@ body::after {
 
 :root[data-theme="light"] #test-spawn-btn {
   background: linear-gradient(135deg, #2a4a6c 0%, #1f3550 100%);
+}
+
+/* ============================================================
+   Mission Builder Page
+   ============================================================ */
+
+.mission-builder-page {
+  padding: 0 !important;
+  margin: 0;
+  height: calc(100vh - 80px);
+  overflow: hidden;
+}
+
+.mission-builder-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: var(--bg-primary);
+}
+
+/* ============================================================
+   Holonet Command Center Page
+   ============================================================ */
+
+.holonet-page {
+  padding: 0 !important;
+  margin: 0;
+  height: calc(100vh - 80px);
+  overflow: hidden;
+}
+
+.holonet-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: #0a0e1a;
+}
+
+/* ============================================================
+   Comms Log Page
+   ============================================================ */
+
+.comms-page {
+  padding: 0 !important;
+  margin: 0;
+  height: calc(100vh - 80px);
+  overflow: hidden;
+}
+
+.comms-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: #0a0a0a;
+}
+
+/* Nav link accents for mission pages */
+.nav-link-missions::before {
+  content: '⚔';
+  margin-right: 4px;
+  font-size: 0.75em;
+}
+
+.nav-link-holonet::before {
+  content: '◉';
+  margin-right: 4px;
+  font-size: 0.75em;
+  color: var(--accent);
+}
+
+.nav-link-comms::before {
+  content: '▸';
+  margin-right: 4px;
+  font-size: 0.75em;
+  color: #33ff33;
 }
