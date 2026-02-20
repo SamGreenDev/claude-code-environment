@@ -791,6 +791,12 @@ class MissionBuilder {
     toolbar.appendChild(sep());
 
     toolbar.appendChild(btn('⚙ Context', '', () => this._showContextModal()));
+
+    this._workdirBadge = document.createElement('span');
+    this._workdirBadge.style.cssText = 'font-size:10px;font-family:"SF Mono","Fira Code",Consolas,monospace;padding:3px 8px;border-radius:4px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    this._updateWorkdirBadge();
+    toolbar.appendChild(this._workdirBadge);
+
     toolbar.appendChild(sep());
     toolbar.appendChild(btn('💾 Save', '', () => this._save()));
     toolbar.appendChild(btn('📂 Load', '', () => this._load()));
@@ -1363,6 +1369,24 @@ class MissionBuilder {
 
       const chipContainer = document.createElement('div');
       chipContainer.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;';
+
+      // Add {context.workdir} chip if workdir is set
+      if (this.context.workdir) {
+        const wdChip = document.createElement('span');
+        const wdText = '{context.workdir}';
+        wdChip.textContent = wdText;
+        wdChip.title = `Click to copy — resolves to "${this.context.workdir}"`;
+        wdChip.style.cssText = 'display:inline-block;padding:2px 8px;border-radius:6px;font-size:0.7rem;font-family:"SF Mono","Fira Code",Consolas,monospace;cursor:pointer;background:rgba(45,106,79,0.15);color:#52c67e;border:1px solid rgba(45,106,79,0.3);transition:background 0.15s;';
+        wdChip.addEventListener('mouseenter', () => { wdChip.style.background = 'rgba(45,106,79,0.3)'; });
+        wdChip.addEventListener('mouseleave', () => { wdChip.style.background = 'rgba(45,106,79,0.15)'; });
+        wdChip.addEventListener('click', () => {
+          navigator.clipboard.writeText(wdText).catch(() => {});
+          wdChip.textContent = 'Copied!';
+          setTimeout(() => { wdChip.textContent = wdText; }, 1200);
+        });
+        chipContainer.appendChild(wdChip);
+      }
+
       rels.parents.forEach(p => {
         const varChip = document.createElement('span');
         const varText = `{${p.id}.output}`;
@@ -1697,6 +1721,53 @@ class MissionBuilder {
     closeBtn.textContent = '×';
     closeBtn.addEventListener('click', () => backdrop.remove());
 
+    // ── Dedicated workdir field ──
+    const workdirSection = document.createElement('div');
+    workdirSection.style.cssText = 'margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #2a2a2a;';
+
+    const workdirLabel = document.createElement('label');
+    workdirLabel.textContent = 'Project Working Directory';
+    workdirLabel.style.cssText = 'display:block;font-size:11px;color:#888;margin-bottom:5px;font-weight:600;';
+    workdirSection.appendChild(workdirLabel);
+
+    const workdirInput = document.createElement('input');
+    workdirInput.type = 'text';
+    workdirInput.value = this.context.workdir || '';
+    workdirInput.placeholder = '~/projects/my-project';
+    workdirInput.style.cssText = 'width:100%;background:#262626;border:1px solid #3a3a3a;color:#F0F0F0;border-radius:5px;padding:7px 10px;font-size:13px;font-family:"SF Mono","Fira Code",Consolas,monospace;outline:none;box-sizing:border-box;';
+    workdirInput.addEventListener('focus', () => { workdirInput.style.borderColor = '#C74634'; });
+    workdirInput.addEventListener('blur', () => { workdirInput.style.borderColor = '#3a3a3a'; });
+    workdirSection.appendChild(workdirInput);
+
+    const workdirHint = document.createElement('div');
+    workdirHint.textContent = 'Agents will spawn in this directory and create files here';
+    workdirHint.style.cssText = 'font-size:10px;color:#555;margin-top:4px;';
+    workdirSection.appendChild(workdirHint);
+
+    // ── Template variable chip for workdir ──
+    const chipContainer = document.createElement('div');
+    chipContainer.style.cssText = 'margin-top:8px;display:flex;gap:6px;align-items:center;';
+    const chipLabel = document.createElement('span');
+    chipLabel.textContent = 'Template var:';
+    chipLabel.style.cssText = 'font-size:10px;color:#555;';
+    chipContainer.appendChild(chipLabel);
+    const workdirChip = document.createElement('span');
+    workdirChip.textContent = '{context.workdir}';
+    workdirChip.title = 'Click to copy — use in prompts to reference the working directory';
+    workdirChip.style.cssText = 'display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-family:"SF Mono","Fira Code",Consolas,monospace;cursor:pointer;background:rgba(79,164,255,0.15);color:#4fa4ff;border:1px solid rgba(79,164,255,0.3);transition:background 0.15s;';
+    workdirChip.addEventListener('click', () => {
+      navigator.clipboard.writeText('{context.workdir}').catch(() => {});
+      workdirChip.textContent = 'Copied!';
+      setTimeout(() => { workdirChip.textContent = '{context.workdir}'; }, 1200);
+    });
+    chipContainer.appendChild(workdirChip);
+    workdirSection.appendChild(chipContainer);
+
+    // ── Generic key-value rows ──
+    const kvTitle = document.createElement('div');
+    kvTitle.textContent = 'Additional Variables';
+    kvTitle.style.cssText = 'font-size:11px;color:#888;margin-bottom:8px;font-weight:600;';
+
     const rowsContainer = document.createElement('div');
     const rows = [];
 
@@ -1727,9 +1798,11 @@ class MissionBuilder {
       rows.push({ keyInput, valInput });
     };
 
-    // Populate existing context
-    Object.entries(this.context).forEach(([k, v]) => addRow(k, v));
-    if (!Object.keys(this.context).length) addRow();
+    // Populate existing context (skip workdir — it has its own field)
+    Object.entries(this.context).forEach(([k, v]) => {
+      if (k !== 'workdir') addRow(k, v);
+    });
+    if (Object.keys(this.context).filter(k => k !== 'workdir').length === 0) addRow();
 
     const addBtn = document.createElement('button');
     addBtn.className = 'mb-btn';
@@ -1750,13 +1823,18 @@ class MissionBuilder {
     saveBtn.textContent = 'Save';
     saveBtn.addEventListener('click', () => {
       const ctx = {};
+      // Save workdir
+      const wd = workdirInput.value.trim();
+      if (wd) ctx.workdir = wd;
+      // Save generic vars
       rowsContainer.querySelectorAll('.mb-ctx-row').forEach(row => {
         const inputs = row.querySelectorAll('input');
         const k = inputs[0].value.trim();
         const v = inputs[1].value.trim();
-        if (k) ctx[k] = v;
+        if (k && k !== 'workdir') ctx[k] = v;
       });
       this.context = ctx;
+      this._updateWorkdirBadge();
       backdrop.remove();
     });
 
@@ -1765,6 +1843,8 @@ class MissionBuilder {
 
     modal.appendChild(closeBtn);
     modal.appendChild(title);
+    modal.appendChild(workdirSection);
+    modal.appendChild(kvTitle);
     modal.appendChild(rowsContainer);
     modal.appendChild(addBtn);
     modal.appendChild(actions);
@@ -1998,6 +2078,7 @@ class MissionBuilder {
       });
     });
 
+    this._updateWorkdirBadge();
     this._deselectNode();
   }
 
@@ -2013,6 +2094,26 @@ class MissionBuilder {
     this.edges.clear();
     this.selectedNodeId = null;
     this.configPanel.classList.add('hidden');
+  }
+
+  // ── Workdir Badge ──────────────────────────────────────────────────────────
+
+  _updateWorkdirBadge() {
+    if (!this._workdirBadge) return;
+    const wd = this.context.workdir;
+    if (wd) {
+      this._workdirBadge.textContent = wd;
+      this._workdirBadge.style.background = 'rgba(45,106,79,0.3)';
+      this._workdirBadge.style.color = '#52c67e';
+      this._workdirBadge.style.border = '1px solid rgba(45,106,79,0.5)';
+      this._workdirBadge.title = `Working directory: ${wd}`;
+    } else {
+      this._workdirBadge.textContent = 'no workdir';
+      this._workdirBadge.style.background = 'rgba(60,60,60,0.3)';
+      this._workdirBadge.style.color = '#555';
+      this._workdirBadge.style.border = '1px solid #333';
+      this._workdirBadge.title = 'No working directory set — click Context to configure';
+    }
   }
 
   // ── Toast ───────────────────────────────────────────────────────────────────

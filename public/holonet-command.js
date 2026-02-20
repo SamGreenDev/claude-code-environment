@@ -925,6 +925,7 @@
           startMs,
           output: statusEntry.output || null,
           error: statusEntry.error || null,
+          files: statusEntry.files || [],
         });
       });
 
@@ -1176,11 +1177,15 @@
           this._addComm('DISPATCH', this._nodeLabel(nodeId), 'Execution started');
           break;
 
-        case 'node_completed':
-          this._updateNodeStatus(nodeId, 'completed', { output: msg.output || null });
-          this._addComm('COMPLETE', this._nodeLabel(nodeId), msg.output ? `Output: ${String(msg.output).slice(0, 80)}` : 'Completed');
+        case 'node_completed': {
+          const files = msg.files || [];
+          this._updateNodeStatus(nodeId, 'completed', { output: msg.output || null, files });
+          let completeMsg = msg.output ? `Output: ${String(msg.output).slice(0, 80)}` : 'Completed';
+          if (files.length) completeMsg += ` (${files.length} file${files.length > 1 ? 's' : ''} created)`;
+          this._addComm('COMPLETE', this._nodeLabel(nodeId), completeMsg);
           this._checkRunComplete();
           break;
+        }
 
         case 'node_failed':
           this._updateNodeStatus(nodeId, 'failed', { error: msg.error || 'Unknown error' });
@@ -1196,6 +1201,8 @@
           this._setStatus('COMPLETED');
           this._addComm('COMPLETE', 'SYSTEM', `Run ${runId || this.currentRunId} completed`);
           this.nodes.forEach(n => { if (n.status === 'running') n.status = 'completed'; });
+          // Fetch and display run summary
+          this._fetchAndDisplaySummary(runId || this.currentRunId);
           break;
 
         case 'run_failed':
@@ -1230,6 +1237,27 @@
         default:
           break;
       }
+    }
+
+    async _fetchAndDisplaySummary(rId) {
+      try {
+        const raw = await fetch(`/api/missions/runs/${rId}/summary`).then(r => r.json());
+        const summary = raw.data;
+        if (!summary) return;
+
+        this._addComm('INFO', 'SUMMARY', `${summary.totalFiles} file${summary.totalFiles !== 1 ? 's' : ''} produced`);
+        if (summary.workdir) {
+          this._addComm('INFO', 'SUMMARY', `Workdir: ${summary.workdir}`);
+        }
+        if (summary.setupHints && summary.setupHints.length) {
+          this._addComm('INFO', 'SUMMARY', `Setup: ${summary.setupHints.join(' && ')}`);
+        }
+        // Show first 10 files
+        const filesToShow = (summary.files || []).slice(0, 10);
+        if (filesToShow.length) {
+          this._addComm('OUTPUT', 'FILES', filesToShow.join(', ') + (summary.totalFiles > 10 ? ` (+${summary.totalFiles - 10} more)` : ''));
+        }
+      } catch (_) { /* best effort */ }
     }
 
     _nodeLabel(nodeId) {
@@ -1315,6 +1343,14 @@
           <div class="hc-overlay-section">
             <div class="hc-overlay-section-label">Error</div>
             <div class="hc-overlay-error">${this._esc(node.error)}</div>
+          </div>`;
+      }
+
+      if (node.files && node.files.length) {
+        html += `
+          <div class="hc-overlay-section">
+            <div class="hc-overlay-section-label">Files Created (${node.files.length})</div>
+            <div class="hc-overlay-output" style="max-height:120px;">${node.files.map(f => this._esc(f)).join('\n')}</div>
           </div>`;
       }
 
