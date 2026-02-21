@@ -31,6 +31,29 @@ function escapeHtml(str) {
 }
 
 /**
+ * Strip dangerous elements/attributes from HTML produced by marked.parse().
+ * Uses DOM-based sanitization so no external dependency is needed.
+ */
+function sanitizeHtml(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  div.querySelectorAll('script,iframe,object,embed,form').forEach(el => el.remove());
+  div.querySelectorAll('*').forEach(el => {
+    for (const attr of [...el.attributes]) {
+      if (attr.name.startsWith('on')) el.removeAttribute(attr.name);
+    }
+    // Strip javascript: URIs from href/src/action
+    for (const prop of ['href', 'src', 'action']) {
+      const val = el.getAttribute(prop);
+      if (val && val.trim().toLowerCase().startsWith('javascript:')) {
+        el.removeAttribute(prop);
+      }
+    }
+  });
+  return div.innerHTML;
+}
+
+/**
  * Show toast notification
  */
 function showToast(message, type = 'info') {
@@ -876,7 +899,7 @@ async function loadProjectMemory(projectId, projectName) {
             <h3>${escapeHtml(file.name)}</h3>
             <span class="memory-file-meta">${sizeStr} &middot; ${modified.toLocaleDateString()}</span>
           </div>
-          <div class="markdown-body">${marked.parse(file.content)}</div>
+          <div class="markdown-body">${sanitizeHtml(marked.parse(file.content))}</div>
         </div>
       `;
     }
@@ -1533,7 +1556,7 @@ async function updateEnvVar(key, value, level = 'user') {
 function showDetailModal(title, content) {
   const modal = templates.detailModal.content.cloneNode(true);
   modal.querySelector('.modal-title').textContent = title;
-  modal.querySelector('.modal-body').innerHTML = marked.parse(content || 'No content available');
+  modal.querySelector('.modal-body').innerHTML = sanitizeHtml(marked.parse(content || 'No content available'));
 
   const modalEl = modal.querySelector('.modal');
 
