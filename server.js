@@ -18,6 +18,7 @@ import { registerSessionRoutes, addSessionClient, startHeartbeatChecker } from '
 import { startTeamWatcher } from './lib/team-watcher.js';
 import { registerMissionRoutes, handleMissionUpgrade, getMissionWss } from './lib/mission-api-handler.js';
 import { registerWizardRoutes } from './lib/wizard-api-handler.js';
+import { missionEngine } from './lib/mission-engine.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, 'public');
@@ -117,26 +118,17 @@ registerSessionRoutes(router);
 registerWizardRoutes(router);  // Must register before mission :id routes
 registerMissionRoutes(router);
 
-// Parse URL query string helper
-function parseQuery(url) {
-  const queryIndex = url.indexOf('?');
-  if (queryIndex === -1) return {};
-  const queryString = url.slice(queryIndex + 1);
-  const params = {};
-  for (const pair of queryString.split('&')) {
-    const [key, value] = pair.split('=');
-    if (key) params[decodeURIComponent(key)] = value ? decodeURIComponent(value) : '';
-  }
-  return params;
-}
-
 // Create HTTP server
 const server = createServer(async (req, res) => {
   // Track activity for auto-shutdown
   resetShutdownTimer();
 
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // CORS: restrict to localhost/127.0.0.1 origins to prevent external sites
+  // from making cross-origin requests to the dashboard API
+  const origin = req.headers.origin || '';
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -165,6 +157,7 @@ server.listen(PORT, () => {
   getMissionWss(); // Initialize mission WebSocket and engine event subscriptions
   startHeartbeatChecker();
   startTeamWatcher();
+  missionEngine.resumeActiveRuns(); // Resume polling for runs that survived a server restart
 
   console.log(`
   ╔════════════════════════════════════════════╗
@@ -191,6 +184,17 @@ server.listen(PORT, () => {
   `);
 
   resetShutdownTimer();
+});
+
+// Global error boundaries — log and continue for rejections, exit for sync exceptions.
+// Without these, Node 18+ terminates on unhandled rejections silently.
+process.on('unhandledRejection', (reason) => {
+  console.error('[environment] Unhandled rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[environment] Uncaught exception:', error);
+  process.exit(1);
 });
 
 // Handle graceful shutdown
