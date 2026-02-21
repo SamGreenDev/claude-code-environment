@@ -803,6 +803,7 @@ class MissionBuilder {
     toolbar.appendChild(btn('🗑 Delete', 'mb-btn-danger', () => this._deleteMission()));
     toolbar.appendChild(sep());
     toolbar.appendChild(btn('📋 Template', '', () => this._saveTemplate()));
+    toolbar.appendChild(btn('✨ Wizard', '', () => this._openWizard()));
     toolbar.appendChild(btn('▶', 'mb-btn-primary', () => this._execute()));
 
     return toolbar;
@@ -1701,6 +1702,15 @@ class MissionBuilder {
       this.selectedNodeId = null;
       this.configPanel.classList.add('hidden');
     }
+  }
+
+  // ── Wizard ──────────────────────────────────────────────────────────────────
+
+  _openWizard() {
+    if (!this._wizard) {
+      this._wizard = new window.MissionWizard(this);
+    }
+    this._wizard.open();
   }
 
   // ── Context Modal ───────────────────────────────────────────────────────────

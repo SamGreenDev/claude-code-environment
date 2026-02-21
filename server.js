@@ -17,6 +17,7 @@ import { initWebSocket, registerActivityRoutes, shutdown as shutdownActivity } f
 import { registerSessionRoutes, addSessionClient, startHeartbeatChecker } from './lib/session-handler.js';
 import { startTeamWatcher } from './lib/team-watcher.js';
 import { registerMissionRoutes, handleMissionUpgrade, getMissionWss } from './lib/mission-api-handler.js';
+import { registerWizardRoutes } from './lib/wizard-api-handler.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, 'public');
@@ -113,6 +114,7 @@ const router = createRouter();
 registerApiRoutes(router);
 registerActivityRoutes(router);
 registerSessionRoutes(router);
+registerWizardRoutes(router);  // Must register before mission :id routes
 registerMissionRoutes(router);
 
 // Parse URL query string helper
