@@ -114,7 +114,13 @@ async function createPDF(screenshots) {
   }
 
   const pdfBytes = await pdfDoc.save();
-  const pluginDir = process.env.PLUGIN_DIR || process.env.HOME + '/.claude/plugins/local/environment';
+  // PLUGIN_DIR must be set by the skill caller — no hardcoded fallback to avoid silent failures
+  // when installed from marketplace (where the path differs from local dev)
+  const pluginDir = process.env.PLUGIN_DIR;
+  if (!pluginDir) {
+    console.error('Error: PLUGIN_DIR environment variable is required');
+    process.exit(1);
+  }
   const outputPath = pluginDir + '/screenshots/environment-screenshots.pdf';
   await fs.mkdir(pluginDir + '/screenshots', { recursive: true });
   await fs.writeFile(outputPath, pdfBytes);

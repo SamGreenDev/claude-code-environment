@@ -140,6 +140,7 @@ class JediArchives {
     this.animationFrame = 0;
     this.ws = null;
     this.connected = false;
+    this._reconnectDelay = 3000; // Exponential backoff: 3s → 6s → 12s → max 30s
 
     // Set canvas size
     this.resize();
@@ -237,6 +238,7 @@ class JediArchives {
       this.ws.onopen = () => {
         console.log('[JediArchives] WebSocket connected');
         this.connected = true;
+        this._reconnectDelay = 3000; // Reset backoff on successful connection
       };
 
       this.ws.onmessage = (event) => {
@@ -251,8 +253,7 @@ class JediArchives {
       this.ws.onclose = () => {
         console.log('[JediArchives] WebSocket disconnected');
         this.connected = false;
-        // Attempt reconnect after 3 seconds
-        setTimeout(() => this.connectWebSocket(), 3000);
+        this._scheduleReconnect();
       };
 
       this.ws.onerror = (err) => {
@@ -260,8 +261,18 @@ class JediArchives {
       };
     } catch (err) {
       console.error('[JediArchives] Failed to connect WebSocket:', err);
-      setTimeout(() => this.connectWebSocket(), 3000);
+      this._scheduleReconnect();
     }
+  }
+
+  /**
+   * Schedule a reconnect with exponential backoff (3s → 6s → 12s → max 30s) plus jitter
+   * to avoid thundering herd if server restarts with multiple clients
+   */
+  _scheduleReconnect() {
+    const jitter = Math.random() * 1000;
+    setTimeout(() => this.connectWebSocket(), this._reconnectDelay + jitter);
+    this._reconnectDelay = Math.min(this._reconnectDelay * 2, 30000);
   }
 
   handleMessage(message) {
