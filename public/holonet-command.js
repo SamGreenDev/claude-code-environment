@@ -1131,6 +1131,10 @@
 
     _onWsOpen() {
       clearTimeout(this._wsReconnectTimer);
+      // After reconnect, re-fetch current run state in case events were missed
+      if (this.currentRunId) {
+        this._pollRunState(this.currentRunId);
+      }
     }
 
     _onWsClose() {
@@ -1140,6 +1144,39 @@
     _scheduleWsReconnect() {
       clearTimeout(this._wsReconnectTimer);
       this._wsReconnectTimer = setTimeout(() => this._connectWs(), RECONNECT_DELAY);
+    }
+
+    /** Re-fetch run state from REST API to catch events missed during WS disconnect. */
+    _pollRunState(runId) {
+      fetch(`/api/missions/runs`)
+        .then(r => r.json())
+        .then(data => {
+          const runs = data.data || data;
+          const run = runs.find(r => r.id === runId);
+          if (!run) return;
+          // Sync node states
+          for (const [nid, ns] of Object.entries(run.nodeStates || {})) {
+            if (ns.status && ns.status !== 'pending') {
+              this._updateNodeStatus(nid, ns.status, {
+                output: ns.output || null,
+                error: ns.error || null,
+                files: ns.files || [],
+              });
+            }
+          }
+          // Sync run-level status
+          if (run.status === 'completed') {
+            this._setStatus('COMPLETED');
+            this._addComm('COMPLETE', 'SYSTEM', 'Run completed (synced after reconnect)');
+          } else if (run.status === 'failed') {
+            this._setStatus('FAILED');
+            this._addComm('FAIL', 'SYSTEM', `Run failed: ${run.error || 'node failure'}`);
+          } else if (run.status === 'aborted') {
+            this._setStatus('ABORTED');
+            this._addComm('INFO', 'SYSTEM', 'Run aborted');
+          }
+        })
+        .catch(() => {});
     }
 
     _onWsMessage(event) {

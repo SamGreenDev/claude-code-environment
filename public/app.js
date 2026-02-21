@@ -188,6 +188,7 @@ function initRouter() {
 }
 
 function handleRoute() {
+  window.scrollTo(0, 0);
   const rawHash = window.location.hash.slice(1) || '/';
   const hash = rawHash.split('?')[0]; // Strip query params before routing
   const [path, ...rest] = hash.split('/').filter(Boolean);
