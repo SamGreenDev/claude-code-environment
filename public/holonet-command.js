@@ -259,6 +259,52 @@
     .hc-comm-RETRY    { border-left-color: #E07A3044; }
     .hc-comm-OUTPUT   { border-left-color: #1B6B9344; }
 
+    /* ── Failure Banner ── */
+    .hc-failure-banner {
+      position: absolute;
+      top: 8px;
+      left: 12px;
+      right: 12px;
+      z-index: 90;
+      background: rgba(220, 38, 38, 0.12);
+      border: 1px solid rgba(220, 38, 38, 0.4);
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: hc-banner-in 0.3s ease-out;
+    }
+    @keyframes hc-banner-in {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .hc-failure-banner-icon { font-size: 16px; flex-shrink: 0; }
+    .hc-failure-banner-text { flex: 1; min-width: 0; }
+    .hc-failure-banner-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ff6b6b;
+    }
+    .hc-failure-banner-detail {
+      font-size: 11px;
+      color: #cc8888;
+      margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .hc-failure-banner .hc-btn { flex-shrink: 0; }
+
+    /* ── Retry Button (topbar) ── */
+    .hc-btn-retry {
+      background: #3a1a1a;
+      border-color: #C74634;
+      color: #ff6b6b;
+      font-weight: 600;
+    }
+    .hc-btn-retry:hover { background: #4a2020; border-color: #D95A4A; color: #ff8888; }
+
     /* ── Node Detail Overlay ── */
     .hc-overlay {
       position: absolute;
@@ -492,6 +538,7 @@
         <select class="hc-run-select"></select>
         <button class="hc-btn hc-btn-primary" id="hc-exec-btn">▶ Execute</button>
         <button class="hc-btn hc-btn-danger"   id="hc-abort-btn">⬛ Abort</button>
+        <button class="hc-btn hc-btn-retry"    id="hc-retry-btn" style="display:none">↻ Retry Failed</button>
         <span class="hc-status-badge" id="hc-status-badge">STANDBY</span>
       `;
       root.appendChild(topbar);
@@ -538,14 +585,17 @@
       this.runSelect = topbar.querySelector('.hc-run-select');
       this.execBtn = topbar.querySelector('#hc-exec-btn');
       this.abortBtn = topbar.querySelector('#hc-abort-btn');
+      this.retryBtn = topbar.querySelector('#hc-retry-btn');
       this.statusBadgeEl = topbar.querySelector('#hc-status-badge');
       this.commsLog = root.querySelector('#hc-comms-log');
       this.canvasWrap = canvasWrap;
+      this.failureBannerEl = null;
 
       // Events
       this.runSelect.addEventListener('change', () => this._onRunSelectChange());
       this.execBtn.addEventListener('click', () => this._onExecute());
       this.abortBtn.addEventListener('click', () => this._onAbort());
+      this.retryBtn.addEventListener('click', () => this._onRetryFailed());
       root.querySelector('#hc-clear-comms').addEventListener('click', () => this._clearComms());
       this.canvas.addEventListener('click', (e) => this._onCanvasClick(e));
 
@@ -753,7 +803,8 @@
           ctx.shadowBlur = 6;
           ctx.shadowColor = '#40916C';
         } else if (node.status === 'failed') {
-          ctx.shadowBlur = 6;
+          const failPulse = 6 + 4 * Math.sin(t * 0.22);
+          ctx.shadowBlur = failPulse;
           ctx.shadowColor = '#DC2626';
         } else if (node.status === 'retrying') {
           ctx.shadowBlur = 6;
@@ -845,6 +896,15 @@
         el.classList.add('pulsing');
       } else {
         el.classList.remove('pulsing');
+      }
+
+      // Show/hide retry button and failure banner
+      if (status === 'FAILED') {
+        if (this.retryBtn) this.retryBtn.style.display = '';
+        this._showFailureBanner();
+      } else {
+        if (this.retryBtn) this.retryBtn.style.display = 'none';
+        this._hideFailureBanner();
       }
     }
 
@@ -1432,6 +1492,88 @@
       }
     }
 
+    // ── Failure Banner & Retry ────────────────────────────────────────────────
+
+    _showFailureBanner() {
+      this._hideFailureBanner();
+      if (!this.currentRunId) return;
+
+      // Find first failed node
+      let failedLabel = 'Unknown node';
+      let failedError = '';
+      for (const [, node] of this.nodes) {
+        if (node.status === 'failed') {
+          failedLabel = node.label || node.id;
+          failedError = node.error || '';
+          break;
+        }
+      }
+
+      const banner = document.createElement('div');
+      banner.className = 'hc-failure-banner';
+      banner.innerHTML = `
+        <span class="hc-failure-banner-icon">⚠</span>
+        <div class="hc-failure-banner-text">
+          <div class="hc-failure-banner-title">Mission Failed — "${this._esc(failedLabel)}" failed</div>
+          ${failedError ? `<div class="hc-failure-banner-detail">${this._esc(String(failedError).slice(0, 120))}</div>` : ''}
+        </div>
+        <button class="hc-btn hc-btn-primary" id="hc-banner-retry">↻ Retry Failed</button>
+      `;
+
+      this.canvasWrap.appendChild(banner);
+      this.failureBannerEl = banner;
+
+      banner.querySelector('#hc-banner-retry').addEventListener('click', () => this._onRetryFailed());
+    }
+
+    _hideFailureBanner() {
+      if (this.failureBannerEl) {
+        this.failureBannerEl.remove();
+        this.failureBannerEl = null;
+      }
+    }
+
+    async _onRetryFailed() {
+      if (!this.currentRunId) return;
+
+      // Find root failed nodes — failed nodes whose upstream parents are NOT failed.
+      // Only these need explicit retry; downstream failed nodes will re-trigger
+      // naturally through the DAG when their parents complete.
+      const failedIds = new Set();
+      for (const [id, node] of this.nodes) {
+        if (node.status === 'failed') failedIds.add(id);
+      }
+      if (!failedIds.size) return;
+
+      const rootFailedIds = [];
+      for (const id of failedIds) {
+        const parents = this.edges.filter(e => e.to === id).map(e => e.from);
+        const hasFailedParent = parents.some(pid => failedIds.has(pid));
+        if (!hasFailedParent) rootFailedIds.push(id);
+      }
+
+      if (!rootFailedIds.length) return;
+
+      // Disable retry buttons during operation
+      if (this.retryBtn) { this.retryBtn.disabled = true; this.retryBtn.textContent = '↻ Retrying…'; }
+      const bannerBtn = this.failureBannerEl?.querySelector('#hc-banner-retry');
+      if (bannerBtn) { bannerBtn.disabled = true; bannerBtn.textContent = '↻ Retrying…'; }
+
+      try {
+        for (const nodeId of rootFailedIds) {
+          await fetch(`/api/missions/runs/${this.currentRunId}/retry/${nodeId}`, { method: 'POST' });
+          this._updateNodeStatus(nodeId, 'retrying');
+          this._addComm('RETRY', this._nodeLabel(nodeId), 'Retry requested');
+        }
+        this._hideFailureBanner();
+        this._setStatus('EXECUTING');
+      } catch (e) {
+        this._addComm('FAIL', 'SYSTEM', `Retry failed: ${e.message}`);
+      } finally {
+        if (this.retryBtn) { this.retryBtn.disabled = false; this.retryBtn.textContent = '↻ Retry Failed'; }
+      }
+    }
+
     // ── Destroy ───────────────────────────────────────────────────────────────
 
     destroy() {
@@ -1441,6 +1583,7 @@
       clearTimeout(this._wsReconnectTimer);
       if (this._resizeObserver) this._resizeObserver.disconnect();
       this._hideOverlay();
+      this._hideFailureBanner();
       this.container.innerHTML = '';
     }
   }
