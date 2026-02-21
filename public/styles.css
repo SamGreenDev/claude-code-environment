@@ -3635,6 +3635,12 @@ body::after {
   overflow: hidden;
 }
 
+/* Hide footer on full-screen pages */
+.main:has(.holonet-page) ~ .footer,
+.main:has(.comms-page) ~ .footer {
+  display: none;
+}
+
 .holonet-container {
   width: 100%;
   height: 100%;

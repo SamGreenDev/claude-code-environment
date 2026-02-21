@@ -296,6 +296,59 @@
     }
     .hc-failure-banner .hc-btn { flex-shrink: 0; }
 
+    /* ── Success Banner ── */
+    .hc-success-banner {
+      position: absolute;
+      top: 8px;
+      left: 12px;
+      right: 12px;
+      z-index: 90;
+      background: rgba(45, 106, 79, 0.12);
+      border: 1px solid rgba(45, 106, 79, 0.4);
+      border-radius: 8px;
+      padding: 10px 14px;
+      animation: hc-banner-in 0.3s ease-out;
+    }
+    .hc-success-banner-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .hc-success-banner-icon { font-size: 16px; flex-shrink: 0; }
+    .hc-success-banner-text { flex: 1; min-width: 0; }
+    .hc-success-banner-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #52c67e;
+    }
+    .hc-success-banner-detail {
+      font-size: 11px;
+      color: #88ccaa;
+      margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .hc-success-banner-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .hc-success-banner .hc-btn { flex-shrink: 0; }
+    .hc-btn-success { background: #1a3a2a; border-color: #40916C; color: #52c67e; font-weight: 600; }
+    .hc-btn-success:hover { background: #2a4a3a; border-color: #52c67e; color: #6ed89a; }
+
+    /* ── Clickable File List ── */
+    .hc-file-link {
+      cursor: pointer;
+      color: #A0A0A0;
+      transition: color 0.15s;
+    }
+    .hc-file-link:hover {
+      color: #4fa4ff;
+      text-decoration: underline;
+    }
+
     /* ── Retry Button (topbar) ── */
     .hc-btn-retry {
       background: #3a1a1a;
@@ -590,6 +643,7 @@
       this.commsLog = root.querySelector('#hc-comms-log');
       this.canvasWrap = canvasWrap;
       this.failureBannerEl = null;
+      this.successBannerEl = null;
 
       // Events
       this.runSelect.addEventListener('change', () => this._onRunSelectChange());
@@ -870,10 +924,10 @@
         ctx.fillStyle = c.text;
         ctx.fillText(node.status.toUpperCase(), labelX, labelY + fontSize + 4 * pos.scale);
 
-        // Timer for running nodes
-        if (node.status === 'running' && node.startMs) {
+        // Timer for running/retrying nodes
+        if ((node.status === 'running' || node.status === 'retrying') && node.startMs) {
           ctx.font = `${smallFont}px 'SF Mono', Consolas, monospace`;
-          ctx.fillStyle = '#4fa4ff';
+          ctx.fillStyle = node.status === 'retrying' ? '#f4a261' : '#4fa4ff';
           ctx.textAlign = 'right';
           ctx.textBaseline = 'bottom';
           ctx.fillText(elapsed(node.startMs), x + w - 6 * pos.scale, y + h - 5 * pos.scale);
@@ -902,9 +956,11 @@
       if (status === 'FAILED') {
         if (this.retryBtn) this.retryBtn.style.display = '';
         this._showFailureBanner();
+        this._hideSuccessBanner();
       } else {
         if (this.retryBtn) this.retryBtn.style.display = 'none';
         this._hideFailureBanner();
+        if (status !== 'COMPLETED') this._hideSuccessBanner();
       }
     }
 
@@ -1013,8 +1069,8 @@
       const node = this.nodes.get(nodeId);
       node.status = status;
       if (extras) Object.assign(node, extras);
-      if (status === 'running' && !node.startMs) node.startMs = Date.now();
-      if (status !== 'running') node.startMs = null;
+      if ((status === 'running' || status === 'retrying') && !node.startMs) node.startMs = Date.now();
+      if (status !== 'running' && status !== 'retrying') node.startMs = null;
       if (!this.positions.size) this.positions = computeLayout(this.nodes, this.edges);
     }
 
@@ -1034,24 +1090,18 @@
         const mArr = Array.isArray(missions) ? missions : (missions.missions || missions.data || []);
         mArr.forEach(m => missionMap.set(m.id || m.missionId, m.name || m.id));
 
+        const statusIcons = { completed: '✓', failed: '✗', aborted: '⬛', running: '●' };
+
         if (runsArr.length) {
           const grp = document.createElement('optgroup');
           grp.label = 'Recent Runs';
           runsArr.slice(0, 20).forEach(run => {
             const opt = document.createElement('option');
             opt.value = `run:${run.id || run.runId}`;
-            const missionName = run.missionName || missionMap.get(run.missionId) || run.name || run.id;
-            const ts = run.startedAt || run.createdAt;
-            let datePart = '';
-            if (ts) {
-              const d = new Date(ts);
-              const mm = String(d.getMonth() + 1).padStart(2, '0');
-              const dd = String(d.getDate()).padStart(2, '0');
-              const hh = String(d.getHours()).padStart(2, '0');
-              const min = String(d.getMinutes()).padStart(2, '0');
-              datePart = `_${mm}-${dd}_${hh}:${min}`;
-            }
-            opt.textContent = `▶ ${missionName}${datePart} (${run.status || 'unknown'})`;
+            const missionName = run.missionName || missionMap.get(run.missionId) || run.name || 'Unknown Mission';
+            const icon = statusIcons[run.status] || '○';
+            const datePart = this._formatRelativeDate(run.startedAt || run.createdAt);
+            opt.textContent = `${icon} ${missionName} · ${datePart} · ${(run.status || 'unknown').toUpperCase()}`;
             grp.appendChild(opt);
           });
           this.runSelect.appendChild(grp);
@@ -1126,6 +1176,11 @@
             }
           }
         } catch (_) { /* best effort */ }
+
+        // Show completion panel for already-completed runs
+        if (runData.status === 'completed') {
+          this._fetchAndDisplaySummary(runId);
+        }
       } catch (e) {
         this._addComm('INFO', 'SYSTEM', `Failed to load run ${runId}: ${e.message}`);
       }
@@ -1354,7 +1409,121 @@
         if (filesToShow.length) {
           this._addComm('OUTPUT', 'FILES', filesToShow.join(', ') + (summary.totalFiles > 10 ? ` (+${summary.totalFiles - 10} more)` : ''));
         }
+
+        // Show completion panel if there are files
+        if (summary.totalFiles > 0) {
+          this._showCompletionPanel(summary, rId);
+        }
       } catch (_) { /* best effort */ }
+    }
+
+    _showCompletionPanel(summary, runId) {
+      this._hideSuccessBanner();
+
+      const fileCount = summary.totalFiles || 0;
+      const workdir = summary.workdir || '';
+      const hints = summary.setupHints || [];
+      const hasServerHint = hints.some(h =>
+        /\b(node|npm start|npm run|npx|python|flask|uvicorn|serve)\b/.test(h)
+      );
+
+      const banner = document.createElement('div');
+      banner.className = 'hc-success-banner';
+
+      let titleText = `Mission Complete — ${fileCount} file${fileCount !== 1 ? 's' : ''} created`;
+      if (workdir) titleText += ` in ${workdir}`;
+
+      let html = `
+        <div class="hc-success-banner-header">
+          <span class="hc-success-banner-icon">✓</span>
+          <div class="hc-success-banner-text">
+            <div class="hc-success-banner-title">${this._esc(titleText)}</div>
+            ${hints.length ? `<div class="hc-success-banner-detail">Setup: ${this._esc(hints.join(' && '))}</div>` : ''}
+          </div>
+          <button class="hc-btn" id="hc-success-dismiss" style="padding:4px 8px;font-size:12px;">✕</button>
+        </div>
+        <div class="hc-success-banner-actions">
+      `;
+
+      if (hasServerHint && runId) {
+        html += `<button class="hc-btn hc-btn-success" id="hc-launch-btn">▶ Launch App</button>`;
+      }
+      if (workdir) {
+        html += `<button class="hc-btn hc-btn-success" id="hc-open-folder-btn">📂 Open Folder</button>`;
+      }
+
+      html += `</div>`;
+      banner.innerHTML = html;
+
+      this.canvasWrap.appendChild(banner);
+      this.successBannerEl = banner;
+
+      // Dismiss
+      banner.querySelector('#hc-success-dismiss').addEventListener('click', () => this._hideSuccessBanner());
+
+      // Open folder
+      const openFolderBtn = banner.querySelector('#hc-open-folder-btn');
+      if (openFolderBtn) {
+        openFolderBtn.addEventListener('click', () => this._openPath(workdir));
+      }
+
+      // Launch app
+      const launchBtn = banner.querySelector('#hc-launch-btn');
+      if (launchBtn) {
+        launchBtn.addEventListener('click', async () => {
+          launchBtn.disabled = true;
+          launchBtn.textContent = '▶ Launching…';
+          try {
+            await fetch(`/api/missions/runs/${runId}/launch`, { method: 'POST' });
+            this._addComm('INFO', 'SYSTEM', `Launched: ${hints.join(' && ')}`);
+            launchBtn.textContent = '▶ Launched';
+          } catch (e) {
+            this._addComm('FAIL', 'SYSTEM', `Launch failed: ${e.message}`);
+            launchBtn.disabled = false;
+            launchBtn.textContent = '▶ Launch App';
+          }
+        });
+      }
+    }
+
+    _hideSuccessBanner() {
+      if (this.successBannerEl) {
+        this.successBannerEl.remove();
+        this.successBannerEl = null;
+      }
+    }
+
+    _openPath(filePath, runId) {
+      const body = { path: filePath };
+      if (runId) body.runId = runId;
+      fetch('/api/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).catch(() => {});
+    }
+
+    _formatRelativeDate(iso) {
+      if (!iso) return '—';
+      try {
+        const d = new Date(iso);
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays === 1) return 'yesterday';
+        if (diffDays < 7) return `${diffDays}d ago`;
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${mm}/${dd}`;
+      } catch {
+        return '—';
+      }
     }
 
     _nodeLabel(nodeId) {
@@ -1444,10 +1613,13 @@
       }
 
       if (node.files && node.files.length) {
+        const fileLinks = node.files.map(f =>
+          `<div class="hc-file-link" data-file="${this._esc(f)}">${this._esc(f)}</div>`
+        ).join('');
         html += `
           <div class="hc-overlay-section">
             <div class="hc-overlay-section-label">Files Created (${node.files.length})</div>
-            <div class="hc-overlay-output" style="max-height:120px;">${node.files.map(f => this._esc(f)).join('\n')}</div>
+            <div class="hc-overlay-output" style="max-height:120px;">${fileLinks}</div>
           </div>`;
       }
 
@@ -1471,6 +1643,17 @@
       if (retryBtn) {
         retryBtn.addEventListener('click', () => this._retryNode(nodeId));
       }
+
+      // Clickable file links
+      overlay.querySelectorAll('.hc-file-link').forEach(el => {
+        el.addEventListener('click', () => {
+          const fileName = el.dataset.file;
+          if (!fileName) return;
+          // Resolve relative to run workdir if available
+          const run = this.currentRunId;
+          this._openPath(fileName, run);
+        });
+      });
     }
 
     _hideOverlay() {
@@ -1486,6 +1669,7 @@
         await fetch(`/api/missions/runs/${this.currentRunId}/retry/${nodeId}`, { method: 'POST' });
         this._updateNodeStatus(nodeId, 'retrying');
         this._addComm('RETRY', this._nodeLabel(nodeId), 'Manual retry requested');
+        this._setStatus('EXECUTING');
         this._hideOverlay();
       } catch (e) {
         this._addComm('FAIL', 'SYSTEM', `Retry failed: ${e.message}`);
@@ -1584,6 +1768,7 @@
       if (this._resizeObserver) this._resizeObserver.disconnect();
       this._hideOverlay();
       this._hideFailureBanner();
+      this._hideSuccessBanner();
       this.container.innerHTML = '';
     }
   }

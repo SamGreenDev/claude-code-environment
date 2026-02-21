@@ -500,15 +500,33 @@ class CommsLog {
 
   async _loadRuns() {
     try {
-      const res = await fetch('/api/missions/runs');
-      if (!res.ok) return;
-      const json = await res.json();
-      const runs = json.data || json;
+      const [runsRes, missionsRes] = await Promise.all([
+        fetch('/api/missions/runs').then(r => r.ok ? r.json() : {}),
+        fetch('/api/missions').then(r => r.ok ? r.json() : {}),
+      ]);
+      const runs = runsRes.data || runsRes || [];
+      const missions = missionsRes.data || missionsRes || [];
 
-      runs.forEach((run) => {
+      // Build mission name lookup
+      const missionMap = {};
+      (Array.isArray(missions) ? missions : []).forEach(m => {
+        missionMap[m.id || m.missionId] = m.name || m.id;
+      });
+
+      const statusIcons = {
+        completed: '✓',
+        failed: '✗',
+        aborted: '⬛',
+        running: '●',
+      };
+
+      (Array.isArray(runs) ? runs : []).forEach((run) => {
         const opt = document.createElement('option');
         opt.value = run.id;
-        opt.textContent = `${run.name || run.id} · ${this._formatDate(run.startedAt)}`;
+        const missionName = missionMap[run.missionId] || 'Unknown Mission';
+        const icon = statusIcons[run.status] || '○';
+        const dateStr = this._formatRelativeDate(run.startedAt);
+        opt.textContent = `${icon} ${missionName} · ${dateStr} · ${(run.status || 'unknown').toUpperCase()}`;
         this._runSelect.appendChild(opt);
       });
     } catch (e) {
@@ -740,6 +758,30 @@ class CommsLog {
       return new Date(iso).toLocaleString();
     } catch {
       return iso;
+    }
+  }
+
+  _formatRelativeDate(iso) {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      const now = new Date();
+      const diffMs = now - d;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return 'just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays === 1) return 'yesterday';
+      if (diffDays < 7) return `${diffDays}d ago`;
+      // Fall back to short date
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${mm}/${dd}`;
+    } catch {
+      return '—';
     }
   }
 
