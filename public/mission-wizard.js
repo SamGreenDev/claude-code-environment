@@ -309,6 +309,7 @@
     'Plan': '#4fa4ff',
     'Explore': '#50C878',
     'general-purpose': '#C74634',
+    'code-implementer': '#22C55E',
     'code-reviewer': '#E07A30',
     'security-reviewer': '#DC2626',
     'architect': '#8B5CF6',
@@ -532,12 +533,26 @@
 
     _addLoadingBubble() {
       const el = document.createElement('div');
-      el.className = 'mw-bubble mw-bubble-assistant mw-loading';
+      el.className = 'mw-bubble mw-bubble-assistant';
+      el.style.display = 'flex';
+      el.style.alignItems = 'center';
+      el.style.gap = '8px';
+
+      const statusText = document.createElement('span');
+      statusText.style.color = '#999';
+      statusText.style.fontSize = '12px';
+      statusText.textContent = 'Evaluating your request';
+
+      const dots = document.createElement('span');
+      dots.className = 'mw-loading';
       for (let i = 0; i < 3; i++) {
         const dot = document.createElement('div');
         dot.className = 'mw-loading-dot';
-        el.appendChild(dot);
+        dots.appendChild(dot);
       }
+
+      el.appendChild(statusText);
+      el.appendChild(dots);
       this._chatEl.appendChild(el);
       this._scrollToBottom();
       return el;
