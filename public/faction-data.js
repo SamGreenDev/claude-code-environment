@@ -26,7 +26,7 @@
   };
 
   // ── Unit Rosters ──────────────────────────────────────────────────────────
-  // 8 units per faction, mapped to agent types
+  // 9 units per faction, mapped to agent types
 
   const UNIT_ROSTER = {
     // ── Original Trilogy ──
@@ -39,6 +39,7 @@
       { type: 'e2e-runner',        unitClass: 'a-wing-recon',      label: 'A-Wing Recon',         color: '#1B6B93', category: 'starfighter' },
       { type: 'Explore',           unitClass: 'pathfinder-scout',  label: 'Pathfinder Scout',     color: '#6B7280', category: 'ground' },
       { type: 'Plan',              unitClass: 'rebel-tactician',   label: 'Rebel Tactician',      color: '#2D6A4F', category: 'command' },
+      { type: 'code-implementer', unitClass: 'rebel-engineer',    label: 'Rebel Engineer',       color: '#22D3EE', category: 'ground' },
     ],
     'empire': [
       { type: 'architect',         unitClass: 'imperial-strategist', label: 'Imperial Strategist', color: '#4fa4ff', category: 'command' },
@@ -49,6 +50,7 @@
       { type: 'e2e-runner',        unitClass: 'tie-interceptor',     label: 'TIE Interceptor',      color: '#1B6B93', category: 'starfighter' },
       { type: 'Explore',           unitClass: 'probe-droid',         label: 'Probe Droid',          color: '#6B7280', category: 'droid' },
       { type: 'Plan',              unitClass: 'grand-moff',          label: 'Grand Moff',           color: '#2D6A4F', category: 'command' },
+      { type: 'code-implementer', unitClass: 'imperial-engineer',  label: 'Imperial Engineer',    color: '#22D3EE', category: 'ground' },
     ],
 
     // ── Prequel Trilogy ──
@@ -61,6 +63,7 @@
       { type: 'e2e-runner',        unitClass: 'v-wing-scout',      label: 'V-Wing Scout',        color: '#1B6B93', category: 'starfighter' },
       { type: 'Explore',           unitClass: 'clone-scout',       label: 'Clone Scout',         color: '#6B7280', category: 'ground' },
       { type: 'Plan',              unitClass: 'republic-strategist',label: 'Republic Strategist', color: '#2D6A4F', category: 'command' },
+      { type: 'code-implementer', unitClass: 'clone-engineer',    label: 'Clone Engineer',      color: '#22D3EE', category: 'ground' },
     ],
     'cis': [
       { type: 'architect',         unitClass: 'tactical-droid',       label: 'Tactical Droid',       color: '#4fa4ff', category: 'droid' },
@@ -71,6 +74,7 @@
       { type: 'e2e-runner',        unitClass: 'hyena-bomber',          label: 'Hyena Bomber',         color: '#1B6B93', category: 'starfighter' },
       { type: 'Explore',           unitClass: 'buzz-droid',            label: 'Buzz Droid',           color: '#6B7280', category: 'droid' },
       { type: 'Plan',              unitClass: 'super-tactical-droid',  label: 'Super Tactical Droid', color: '#2D6A4F', category: 'command' },
+      { type: 'code-implementer', unitClass: 'b1-engineer-droid',   label: 'B1 Engineer Droid',    color: '#22D3EE', category: 'droid' },
     ],
 
     // ── Sequel Trilogy ──
@@ -83,6 +87,7 @@
       { type: 'e2e-runner',        unitClass: 'rz2-awing',            label: 'RZ-2 A-Wing',         color: '#1B6B93', category: 'starfighter' },
       { type: 'Explore',           unitClass: 'resistance-scout',     label: 'Resistance Scout',     color: '#6B7280', category: 'ground' },
       { type: 'Plan',              unitClass: 'resistance-tactician', label: 'Resistance Tactician', color: '#2D6A4F', category: 'command' },
+      { type: 'code-implementer', unitClass: 'resistance-engineer', label: 'Resistance Engineer', color: '#22D3EE', category: 'ground' },
     ],
     'first-order': [
       { type: 'architect',         unitClass: 'fo-strategist',         label: 'FO Strategist',          color: '#4fa4ff', category: 'command' },
@@ -93,6 +98,7 @@
       { type: 'e2e-runner',        unitClass: 'tie-sf-fighter',        label: 'TIE/sf Fighter',         color: '#1B6B93', category: 'starfighter' },
       { type: 'Explore',           unitClass: 'fo-recon-droid',        label: 'FO Recon Droid',         color: '#6B7280', category: 'droid' },
       { type: 'Plan',              unitClass: 'supreme-leaders-hand',  label: "Supreme Leader's Hand",  color: '#2D6A4F', category: 'command' },
+      { type: 'code-implementer', unitClass: 'fo-engineer',           label: 'FO Engineer',            color: '#22D3EE', category: 'ground' },
     ],
   };
 
