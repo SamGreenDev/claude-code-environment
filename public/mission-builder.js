@@ -462,6 +462,60 @@ function injectStyles() {
     }
     .mb-delete-node-btn:hover { background: #2a1010; border-color: #DC2626; }
 
+    /* ── Config Tabs ── */
+    .mb-config-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid #2a2a2a;
+      background: #0d0d0d;
+    }
+    .mb-config-tab {
+      background: none;
+      border: none;
+      color: #666;
+      padding: 8px 14px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .mb-config-tab:hover { color: #F0F0F0; background: #1a1a1a; }
+    .mb-config-tab.active {
+      color: #C74634;
+      border-bottom-color: #C74634;
+    }
+    .mb-config-tab-panel { display: none; }
+    .mb-config-tab-panel.active { display: block; }
+
+    /* ── Skill Chips ── */
+    .mb-skill-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: 1px solid #3F3F3F;
+      background: #383838;
+      color: #F5F5F5;
+    }
+    .mb-skill-chip:hover { border-color: #C74634; }
+    .mb-skill-chip.selected {
+      border-color: #C74634;
+      background: rgba(199,70,52,0.15);
+      color: #E8685A;
+    }
+    .mb-skill-desc {
+      font-size: 0.7rem;
+      color: #6B7280;
+      margin-top: 2px;
+      line-height: 1.3;
+    }
+
     /* ── Modal ── */
     .mb-modal-backdrop {
       position: fixed;
@@ -1008,6 +1062,7 @@ class MissionBuilder {
       provider: 'claude-code',
       model: '',
       mcpServers: [],
+      skills: [],
       element: el,
       inputPort,
       outputPort,
@@ -1116,6 +1171,49 @@ class MissionBuilder {
       return wrap;
     };
 
+    // ── Tab Bar ──
+    const tabBar = document.createElement('div');
+    tabBar.className = 'mb-config-tabs';
+
+    const tabDefs = [
+      { id: 'config', label: 'Config' },
+      { id: 'skills', label: 'Skills' },
+      { id: 'context', label: 'Context' },
+    ];
+    const panels = {};
+
+    tabDefs.forEach((td, i) => {
+      const tabBtn = document.createElement('button');
+      tabBtn.className = 'mb-config-tab' + (i === 0 ? ' active' : '');
+      tabBtn.textContent = td.label;
+      tabBtn.dataset.tab = td.id;
+
+      // Badge for skills count
+      if (td.id === 'skills' && node.skills?.length > 0) {
+        tabBtn.textContent = `${td.label} (${node.skills.length})`;
+      }
+
+      tabBtn.addEventListener('click', () => {
+        tabBar.querySelectorAll('.mb-config-tab').forEach(b => b.classList.remove('active'));
+        tabBtn.classList.add('active');
+        Object.values(panels).forEach(p => p.classList.remove('active'));
+        panels[td.id].classList.add('active');
+      });
+      tabBar.appendChild(tabBtn);
+
+      const panel = document.createElement('div');
+      panel.className = 'mb-config-tab-panel' + (i === 0 ? ' active' : '');
+      panels[td.id] = panel;
+    });
+
+    body.appendChild(tabBar);
+    Object.values(panels).forEach(p => body.appendChild(p));
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TAB 1: Config
+    // ═══════════════════════════════════════════════════════════════════════════
+    const configPanel = panels.config;
+
     // Label
     const labelInput = document.createElement('input');
     labelInput.type = 'text';
@@ -1125,7 +1223,15 @@ class MissionBuilder {
       node.labelEl.textContent = labelInput.value;
       node.iconEl.textContent = labelInput.value.charAt(0);
     });
-    body.appendChild(field('Label', labelInput));
+    configPanel.appendChild(field('Label', labelInput));
+
+    // Prompt
+    const promptTA = document.createElement('textarea');
+    promptTA.rows = 6;
+    promptTA.placeholder = 'Describe this agent\'s mission objectives…';
+    promptTA.value = node.prompt;
+    promptTA.addEventListener('input', () => { node.prompt = promptTA.value; });
+    configPanel.appendChild(field('Prompt / Instructions', promptTA));
 
     // Agent Type
     const typeSelect = document.createElement('select');
@@ -1145,37 +1251,7 @@ class MissionBuilder {
       node.iconEl.style.background = unit.color;
       node.typeEl.textContent = unit.type;
     });
-    body.appendChild(field('Agent Type', typeSelect));
-
-    // Prompt
-    const promptTA = document.createElement('textarea');
-    promptTA.rows = 6;
-    promptTA.placeholder = 'Describe this agent\'s mission objectives…';
-    promptTA.value = node.prompt;
-    promptTA.addEventListener('input', () => { node.prompt = promptTA.value; });
-    body.appendChild(field('Prompt / Instructions', promptTA));
-
-    // Timeout
-    const timeoutInput = document.createElement('input');
-    timeoutInput.type = 'number';
-    timeoutInput.min = 30;
-    timeoutInput.max = 3600;
-    timeoutInput.value = node.config.timeout;
-    timeoutInput.addEventListener('input', () => {
-      node.config.timeout = parseInt(timeoutInput.value, 10) || 300;
-    });
-    body.appendChild(field('Timeout (seconds)', timeoutInput));
-
-    // Retries
-    const retriesInput = document.createElement('input');
-    retriesInput.type = 'number';
-    retriesInput.min = 0;
-    retriesInput.max = 3;
-    retriesInput.value = node.config.retries;
-    retriesInput.addEventListener('input', () => {
-      node.config.retries = parseInt(retriesInput.value, 10) || 0;
-    });
-    body.appendChild(field('Retries', retriesInput));
+    configPanel.appendChild(field('Agent Type', typeSelect));
 
     // Provider
     const providerSelect = document.createElement('select');
@@ -1187,7 +1263,7 @@ class MissionBuilder {
       providerSelect.appendChild(opt);
     });
     providerSelect.addEventListener('change', () => { node.provider = providerSelect.value; });
-    body.appendChild(field('Provider', providerSelect));
+    configPanel.appendChild(field('Provider', providerSelect));
 
     // Model selector
     const modelSelect = document.createElement('select');
@@ -1211,23 +1287,176 @@ class MissionBuilder {
         node.badgeEl.textContent = `⚡ ${_modelLabel(node.model)}`;
       }
     });
-    body.appendChild(field('Model', modelSelect));
+    configPanel.appendChild(field('Model', modelSelect));
+
+    // Timeout
+    const timeoutInput = document.createElement('input');
+    timeoutInput.type = 'number';
+    timeoutInput.min = 30;
+    timeoutInput.max = 3600;
+    timeoutInput.value = node.config.timeout;
+    timeoutInput.addEventListener('input', () => {
+      node.config.timeout = parseInt(timeoutInput.value, 10) || 300;
+    });
+    configPanel.appendChild(field('Timeout (seconds)', timeoutInput));
+
+    // Retries
+    const retriesInput = document.createElement('input');
+    retriesInput.type = 'number';
+    retriesInput.min = 0;
+    retriesInput.max = 3;
+    retriesInput.value = node.config.retries;
+    retriesInput.addEventListener('input', () => {
+      node.config.retries = parseInt(retriesInput.value, 10) || 0;
+    });
+    configPanel.appendChild(field('Retries', retriesInput));
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TAB 2: Skills
+    // ═══════════════════════════════════════════════════════════════════════════
+    const skillsPanel = panels.skills;
+
+    const skillsHeader = document.createElement('div');
+    skillsHeader.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-top:8px;';
+    const skillsTitle = document.createElement('div');
+    skillsTitle.textContent = 'Available Skills';
+    skillsTitle.style.cssText = 'font-weight:600;font-size:0.875rem;color:#F5F5F5;';
+    skillsHeader.appendChild(skillsTitle);
+    const skillsBadge = document.createElement('span');
+    skillsBadge.textContent = (node.skills || []).length > 0 ? `${node.skills.length} selected` : '';
+    skillsBadge.style.cssText = 'font-size:0.7rem;color:#6B7280;';
+    skillsHeader.appendChild(skillsBadge);
+    skillsPanel.appendChild(skillsHeader);
+
+    const skillsDesc = document.createElement('div');
+    skillsDesc.textContent = 'Skills inject specialized instructions into agents at spawn time.';
+    skillsDesc.style.cssText = 'font-size:0.75rem;color:#6B7280;margin-bottom:10px;';
+    skillsPanel.appendChild(skillsDesc);
+
+    // Filter input
+    const skillsFilter = document.createElement('input');
+    skillsFilter.type = 'text';
+    skillsFilter.placeholder = 'Filter skills…';
+    skillsFilter.style.cssText = 'width:100%;padding:6px 8px;margin-bottom:8px;background:var(--bg-primary, #161616);color:var(--text-primary, #F5F5F5);border:1px solid var(--border-default, #3F3F3F);border-radius:6px;font-size:0.8rem;box-sizing:border-box;';
+    skillsFilter.addEventListener('input', () => {
+      if (this._skillsCache) renderSkillChips(this._skillsCache);
+    });
+    skillsPanel.appendChild(skillsFilter);
+
+    const skillsChipsContainer = document.createElement('div');
+    skillsChipsContainer.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
+
+    const updateSkillsTabBadge = () => {
+      const count = (node.skills || []).length;
+      skillsBadge.textContent = count > 0 ? `${count} selected` : '';
+      // Update tab button text
+      const skillsTabBtn = tabBar.querySelector('[data-tab="skills"]');
+      if (skillsTabBtn) skillsTabBtn.textContent = count > 0 ? `Skills (${count})` : 'Skills';
+    };
+
+    const renderSkillChips = (skills) => {
+      skillsChipsContainer.innerHTML = '';
+      if (!skills || skills.length === 0) {
+        const empty = document.createElement('div');
+        empty.textContent = 'No skills available';
+        empty.style.cssText = 'font-style:italic;color:#6B7280;font-size:0.8rem;';
+        skillsChipsContainer.appendChild(empty);
+        return;
+      }
+      const query = (skillsFilter.value || '').toLowerCase().trim();
+      const filtered = query
+        ? skills.filter(s => {
+            const selected = (node.skills || []).includes(s.id);
+            if (selected) return true; // always show selected
+            return (s.id || '').toLowerCase().includes(query)
+              || (s.title || '').toLowerCase().includes(query)
+              || (s.description || '').toLowerCase().includes(query);
+          })
+        : skills;
+      filtered.forEach(skill => {
+        const isSelected = (node.skills || []).includes(skill.id);
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;flex-direction:column;gap:2px;';
+
+        const chip = document.createElement('span');
+        chip.className = 'mb-skill-chip' + (isSelected ? ' selected' : '');
+        chip.textContent = skill.title || skill.id;
+        chip.title = skill.description || 'Click to toggle';
+
+        chip.addEventListener('click', () => {
+          if (!node.skills) node.skills = [];
+          const idx = node.skills.indexOf(skill.id);
+          if (idx >= 0) {
+            node.skills.splice(idx, 1);
+          } else {
+            node.skills.push(skill.id);
+          }
+          updateSkillsTabBadge();
+          renderSkillChips(skills);
+        });
+
+        row.appendChild(chip);
+
+        if (skill.description) {
+          const desc = document.createElement('div');
+          desc.className = 'mb-skill-desc';
+          desc.textContent = skill.description;
+          desc.style.paddingLeft = '12px';
+          row.appendChild(desc);
+        }
+
+        skillsChipsContainer.appendChild(row);
+      });
+    };
+
+    // Fetch skills with caching
+    const now = Date.now();
+    if (!this._skillsCache || !this._skillsCacheTime || (now - this._skillsCacheTime > 60000)) {
+      const loadingMsg = document.createElement('div');
+      loadingMsg.textContent = 'Loading skills\u2026';
+      loadingMsg.style.cssText = 'font-style:italic;color:#6B7280;font-size:0.8rem;';
+      skillsChipsContainer.appendChild(loadingMsg);
+
+      fetch('/api/skills')
+        .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+        .then(data => {
+          this._skillsCache = data.skills || data || [];
+          this._skillsCacheTime = Date.now();
+          renderSkillChips(this._skillsCache);
+        })
+        .catch(() => {
+          skillsChipsContainer.innerHTML = '';
+          const err = document.createElement('div');
+          err.textContent = 'Failed to load skills';
+          err.style.cssText = 'font-style:italic;color:#E07A30;font-size:0.8rem;';
+          skillsChipsContainer.appendChild(err);
+        });
+    } else {
+      renderSkillChips(this._skillsCache);
+    }
+
+    skillsPanel.appendChild(skillsChipsContainer);
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // TAB 3: Context (MCP Servers + Connections)
+    // ═══════════════════════════════════════════════════════════════════════════
+    const contextPanel = panels.context;
 
     // MCP Servers section
     const mcpSection = document.createElement('div');
-    mcpSection.style.cssText = 'margin-top:16px;border-top:1px solid var(--border-subtle, #2E2E2E);padding-top:12px;';
+    mcpSection.style.cssText = 'margin-top:16px;border-top:1px solid #2E2E2E;padding-top:12px;';
 
     const mcpHeader = document.createElement('div');
     mcpHeader.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
     const mcpTitle = document.createElement('div');
     mcpTitle.textContent = 'MCP Servers';
-    mcpTitle.style.cssText = 'font-weight:600;font-size:0.875rem;color:var(--text-primary, #F5F5F5);';
+    mcpTitle.style.cssText = 'font-weight:600;font-size:0.875rem;color:#F5F5F5;';
     mcpHeader.appendChild(mcpTitle);
 
     const mcpBadge = document.createElement('span');
     const selectedCount = (node.mcpServers || []).length;
     mcpBadge.textContent = selectedCount > 0 ? `${selectedCount} selected` : '';
-    mcpBadge.style.cssText = 'font-size:0.7rem;color:var(--text-muted, #6B7280);';
+    mcpBadge.style.cssText = 'font-size:0.7rem;color:#6B7280;';
     mcpHeader.appendChild(mcpBadge);
     mcpSection.appendChild(mcpHeader);
 
@@ -1239,7 +1468,7 @@ class MissionBuilder {
       if (!servers || servers.length === 0) {
         const empty = document.createElement('div');
         empty.textContent = 'No MCP servers configured';
-        empty.style.cssText = 'font-style:italic;color:var(--text-muted, #6B7280);font-size:0.8rem;';
+        empty.style.cssText = 'font-style:italic;color:#6B7280;font-size:0.8rem;';
         mcpChipsContainer.appendChild(empty);
         return;
       }
@@ -1251,7 +1480,7 @@ class MissionBuilder {
         const icon = typeIcons[server.type] || '\u2699\uFE0F';
         chip.textContent = `${icon} ${server.name}`;
         chip.title = `${server.type} — click to toggle`;
-        chip.style.cssText = `display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:12px;font-size:0.75rem;cursor:pointer;transition:all 0.15s;border:1px solid ${isSelected ? 'var(--accent, #C74634)' : 'var(--border-default, #3F3F3F)'};background:${isSelected ? 'rgba(199,70,52,0.15)' : 'var(--bg-hover, #383838)'};color:${isSelected ? 'var(--accent-light, #E8685A)' : 'var(--text-primary, #F5F5F5)'};`;
+        chip.style.cssText = `display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:12px;font-size:0.75rem;cursor:pointer;transition:all 0.15s;border:1px solid ${isSelected ? '#C74634' : '#3F3F3F'};background:${isSelected ? 'rgba(199,70,52,0.15)' : '#383838'};color:${isSelected ? '#E8685A' : '#F5F5F5'};`;
 
         chip.addEventListener('click', () => {
           if (!node.mcpServers) node.mcpServers = [];
@@ -1266,10 +1495,10 @@ class MissionBuilder {
         });
 
         chip.addEventListener('mouseenter', () => {
-          if (!isSelected) chip.style.borderColor = 'var(--accent, #C74634)';
+          if (!isSelected) chip.style.borderColor = '#C74634';
         });
         chip.addEventListener('mouseleave', () => {
-          if (!isSelected) chip.style.borderColor = 'var(--border-default, #3F3F3F)';
+          if (!isSelected) chip.style.borderColor = '#3F3F3F';
         });
 
         mcpChipsContainer.appendChild(chip);
@@ -1277,11 +1506,10 @@ class MissionBuilder {
     };
 
     // Fetch MCP servers with caching
-    const now = Date.now();
     if (!this._mcpServersCache || !this._mcpServersCacheTime || (now - this._mcpServersCacheTime > 60000)) {
       const loadingMsg = document.createElement('div');
       loadingMsg.textContent = 'Loading MCP servers\u2026';
-      loadingMsg.style.cssText = 'font-style:italic;color:var(--text-muted, #6B7280);font-size:0.8rem;';
+      loadingMsg.style.cssText = 'font-style:italic;color:#6B7280;font-size:0.8rem;';
       mcpChipsContainer.appendChild(loadingMsg);
 
       fetch('/api/mcp-servers')
@@ -1295,7 +1523,7 @@ class MissionBuilder {
           mcpChipsContainer.innerHTML = '';
           const err = document.createElement('div');
           err.textContent = 'Failed to load MCP servers';
-          err.style.cssText = 'font-style:italic;color:var(--warning, #E07A30);font-size:0.8rem;';
+          err.style.cssText = 'font-style:italic;color:#E07A30;font-size:0.8rem;';
           mcpChipsContainer.appendChild(err);
         });
     } else {
@@ -1303,23 +1531,23 @@ class MissionBuilder {
     }
 
     mcpSection.appendChild(mcpChipsContainer);
-    body.appendChild(mcpSection);
+    contextPanel.appendChild(mcpSection);
 
     // Connections section
     const rels = this._computeRelationships(node.id);
     const connSection = document.createElement('div');
-    connSection.style.cssText = 'margin-top:16px;border-top:1px solid var(--border-subtle, #2E2E2E);padding-top:12px;';
+    connSection.style.cssText = 'margin-top:16px;border-top:1px solid #2E2E2E;padding-top:12px;';
 
     const connTitle = document.createElement('div');
     connTitle.textContent = 'Connections';
-    connTitle.style.cssText = 'font-weight:600;font-size:0.875rem;margin-bottom:8px;color:var(--text-primary, #F5F5F5);';
+    connTitle.style.cssText = 'font-weight:600;font-size:0.875rem;margin-bottom:8px;color:#F5F5F5;';
     connSection.appendChild(connTitle);
 
     const hasAny = rels.parents.length || rels.children.length || rels.siblings.length;
     if (!hasAny) {
       const empty = document.createElement('div');
       empty.textContent = 'No connections yet';
-      empty.style.cssText = 'font-style:italic;color:var(--text-muted, #6B7280);font-size:0.8rem;';
+      empty.style.cssText = 'font-style:italic;color:#6B7280;font-size:0.8rem;';
       connSection.appendChild(empty);
     } else {
       const renderGroup = (label, nodes, dotColor) => {
@@ -1328,18 +1556,17 @@ class MissionBuilder {
         group.style.cssText = 'margin-bottom:6px;';
         const groupLabel = document.createElement('div');
         groupLabel.textContent = label;
-        groupLabel.style.cssText = 'font-size:0.75rem;color:var(--text-secondary, #9CA3AF);margin-bottom:4px;';
+        groupLabel.style.cssText = 'font-size:0.75rem;color:#9CA3AF;margin-bottom:4px;';
         group.appendChild(groupLabel);
         const chips = document.createElement('div');
         chips.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;';
         nodes.forEach(n => {
           const chip = document.createElement('span');
           chip.textContent = n.label;
-          chip.style.cssText = `display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:0.75rem;cursor:pointer;background:var(--bg-hover, #383838);color:var(--text-primary, #F5F5F5);transition:background 0.15s;`;
-          chip.addEventListener('mouseenter', () => { chip.style.background = 'var(--accent, #C74634)'; });
-          chip.addEventListener('mouseleave', () => { chip.style.background = 'var(--bg-hover, #383838)'; });
+          chip.style.cssText = `display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:0.75rem;cursor:pointer;background:#383838;color:#F5F5F5;transition:background 0.15s;`;
+          chip.addEventListener('mouseenter', () => { chip.style.background = '#C74634'; });
+          chip.addEventListener('mouseleave', () => { chip.style.background = '#383838'; });
           chip.addEventListener('click', () => { this._selectNode(n.id); });
-          // Dot indicator
           const dot = document.createElement('span');
           dot.style.cssText = `width:6px;height:6px;border-radius:50%;background:${dotColor};display:inline-block;flex-shrink:0;`;
           chip.prepend(dot);
@@ -1356,22 +1583,21 @@ class MissionBuilder {
     // Template variable hints for parent outputs
     if (rels.parents.length > 0) {
       const hintSection = document.createElement('div');
-      hintSection.style.cssText = 'margin-top:10px;padding:8px;background:var(--bg-elevated, #2E2E2E);border-radius:8px;border:1px solid var(--border-subtle, #2E2E2E);';
+      hintSection.style.cssText = 'margin-top:10px;padding:8px;background:#2E2E2E;border-radius:8px;border:1px solid #2E2E2E;';
 
       const hintTitle = document.createElement('div');
       hintTitle.textContent = 'Template Variables';
-      hintTitle.style.cssText = 'font-size:0.7rem;color:var(--text-secondary, #9CA3AF);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;';
+      hintTitle.style.cssText = 'font-size:0.7rem;color:#9CA3AF;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;';
       hintSection.appendChild(hintTitle);
 
       const hintDesc = document.createElement('div');
       hintDesc.textContent = 'Use these in prompts to reference parent outputs:';
-      hintDesc.style.cssText = 'font-size:0.75rem;color:var(--text-muted, #6B7280);margin-bottom:6px;';
+      hintDesc.style.cssText = 'font-size:0.75rem;color:#6B7280;margin-bottom:6px;';
       hintSection.appendChild(hintDesc);
 
       const chipContainer = document.createElement('div');
       chipContainer.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;';
 
-      // Add {context.workdir} chip if workdir is set
       if (this.context.workdir) {
         const wdChip = document.createElement('span');
         const wdText = '{context.workdir}';
@@ -1407,7 +1633,7 @@ class MissionBuilder {
       connSection.appendChild(hintSection);
     }
 
-    body.appendChild(connSection);
+    contextPanel.appendChild(connSection);
   }
 
   _computeRelationships(nodeId) {
@@ -1882,6 +2108,7 @@ class MissionBuilder {
         provider: n.provider,
         model: n.model || '',
         mcpServers: [...(n.mcpServers || [])],
+        skills: [...(n.skills || [])],
       })),
       edges: Array.from(this.edges.values()).map(e => ({
         id: e.id,
@@ -1988,7 +2215,8 @@ class MissionBuilder {
       this._toast('No saved mission to delete', '#E07A30');
       return;
     }
-    if (!confirm(`Delete mission "${this.missionName}"? This cannot be undone.`)) return;
+    const ok = await showConfirmModal(`Delete mission "${this.missionName}"? This cannot be undone.`, { title: 'Delete Mission' });
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/missions/${this.missionId}`, { method: 'DELETE' });
@@ -2065,6 +2293,7 @@ class MissionBuilder {
       node.config = { timeout: 300, retries: 1, ...nd.config };
       node.provider = nd.provider || 'claude-code';
       node.mcpServers = nd.mcpServers || [];
+      node.skills = nd.skills || [];
       node.model = nd.model || '';
       node.labelEl.textContent = node.label;
       node.iconEl.textContent = node.label.charAt(0);

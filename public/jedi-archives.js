@@ -142,9 +142,13 @@ class JediArchives {
     this.connected = false;
     this._reconnectDelay = 3000; // Exponential backoff: 3s → 6s → 12s → max 30s
 
-    // Set canvas size
+    // Set canvas size — ResizeObserver catches sidebar collapse/expand too
     this.resize();
     window.addEventListener('resize', () => this.resize());
+    if (typeof ResizeObserver !== 'undefined') {
+      this._resizeObserver = new ResizeObserver(() => this.resize());
+      this._resizeObserver.observe(this.canvas.parentElement);
+    }
 
     // Start animation loop
     this.animate = this.animate.bind(this);

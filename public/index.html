@@ -17,33 +17,197 @@
 </head>
 <body>
   <div id="app">
-    <!-- Header -->
-    <header class="header">
-      <div class="header-content">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <!-- Sidebar header: logo + collapse toggle -->
+      <div class="sidebar-header">
         <a href="#/" class="logo">
           <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2L2 7l10 5 10-5-10-5z"/>
             <path d="M2 17l10 5 10-5"/>
             <path d="M2 12l10 5 10-5"/>
           </svg>
-          <span>Environment</span>
+          <span class="sidebar-label">Environment</span>
         </a>
-        <nav class="nav">
-          <a href="#/activity" class="nav-link nav-link-activity" data-route="activity">Activity</a>
-          <a href="#/agents" class="nav-link" data-route="agents">Agents</a>
-          <a href="#/skills" class="nav-link" data-route="skills">Skills</a>
-          <a href="#/commands" class="nav-link" data-route="commands">Commands</a>
-          <a href="#/rules" class="nav-link" data-route="rules">Rules</a>
-          <a href="#/plugins" class="nav-link" data-route="plugins">Plugins</a>
-          <a href="#/mcp-servers" class="nav-link" data-route="mcp-servers">MCP Servers</a>
-          <a href="#/memory" class="nav-link" data-route="memory">Memory</a>
-          <a href="#/mission-builder" class="nav-link nav-link-missions" data-route="mission-builder">Missions</a>
-          <a href="#/holonet" class="nav-link nav-link-holonet" data-route="holonet">Holonet</a>
-          <a href="#/comms" class="nav-link nav-link-comms" data-route="comms">Comms</a>
-          <a href="#/settings" class="nav-link" data-route="settings">Settings</a>
-        </nav>
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+
+        <!-- Activity -->
+        <a href="#/activity" class="sidebar-link" data-route="activity">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          <span class="sidebar-label">Activity</span>
+        </a>
+
+        <div class="sidebar-divider"></div>
+
+        <!-- Customizations group -->
+        <div class="sidebar-group" data-group="customizations">
+          <button class="sidebar-group-toggle" aria-expanded="false">
+            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+            </svg>
+            <span class="sidebar-label">Customizations</span>
+            <svg class="sidebar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+          <div class="sidebar-group-items">
+            <a href="#/agents" class="sidebar-link sidebar-link-nested" data-route="agents">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                <circle cx="12" cy="16" r="1"/>
+              </svg>
+              <span class="sidebar-label">Agents</span>
+            </a>
+            <a href="#/skills" class="sidebar-link sidebar-link-nested" data-route="skills">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+              <span class="sidebar-label">Skills</span>
+            </a>
+            <a href="#/commands" class="sidebar-link sidebar-link-nested" data-route="commands">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4 17 10 11 4 5"/>
+                <line x1="12" y1="19" x2="20" y2="19"/>
+              </svg>
+              <span class="sidebar-label">Commands</span>
+            </a>
+            <a href="#/rules" class="sidebar-link sidebar-link-nested" data-route="rules">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"/>
+                <line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="3.01" y2="6"/>
+                <line x1="3" y1="12" x2="3.01" y2="12"/>
+                <line x1="3" y1="18" x2="3.01" y2="18"/>
+              </svg>
+              <span class="sidebar-label">Rules</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="sidebar-divider"></div>
+
+        <!-- Plugins -->
+        <a href="#/plugins" class="sidebar-link" data-route="plugins">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+            <line x1="7" y1="7" x2="7.01" y2="7"/>
+          </svg>
+          <span class="sidebar-label">Plugins</span>
+        </a>
+
+        <!-- MCP Servers -->
+        <a href="#/mcp-servers" class="sidebar-link" data-route="mcp-servers">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+            <line x1="6" y1="6" x2="6.01" y2="6"/>
+            <line x1="6" y1="18" x2="6.01" y2="18"/>
+          </svg>
+          <span class="sidebar-label">MCP Servers</span>
+        </a>
+
+        <!-- Memory -->
+        <a href="#/memory" class="sidebar-link" data-route="memory">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <ellipse cx="12" cy="5" rx="9" ry="3"/>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+          </svg>
+          <span class="sidebar-label">Memory</span>
+        </a>
+
+        <div class="sidebar-divider"></div>
+
+        <!-- Missions group -->
+        <div class="sidebar-group" data-group="missions">
+          <button class="sidebar-group-toggle" aria-expanded="false">
+            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polygon points="10 8 16 12 10 16 10 8"/>
+            </svg>
+            <span class="sidebar-label">Missions</span>
+            <svg class="sidebar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+          <div class="sidebar-group-items">
+            <a href="#/missions" class="sidebar-link sidebar-link-nested" data-route="missions">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"/>
+                <line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="3.01" y2="6"/>
+                <line x1="3" y1="12" x2="3.01" y2="12"/>
+                <line x1="3" y1="18" x2="3.01" y2="18"/>
+              </svg>
+              <span class="sidebar-label">List</span>
+            </a>
+            <a href="#/mission-builder" class="sidebar-link sidebar-link-nested" data-route="mission-builder">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="12" y1="18" x2="12" y2="12"/>
+                <line x1="9" y1="15" x2="15" y2="15"/>
+              </svg>
+              <span class="sidebar-label">Builder</span>
+            </a>
+            <a href="#/holonet" class="sidebar-link sidebar-link-nested" data-route="holonet">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+              <span class="sidebar-label">Holonet</span>
+            </a>
+            <a href="#/comms" class="sidebar-link sidebar-link-nested" data-route="comms">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span class="sidebar-label">Comms</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="sidebar-divider"></div>
+
+        <!-- Projects -->
+        <a href="#/projects" class="sidebar-link" data-route="projects">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span class="sidebar-label">Projects</span>
+        </a>
+
+        <div class="sidebar-spacer"></div>
+
+        <!-- Settings (anchored bottom) -->
+        <a href="#/settings" class="sidebar-link" data-route="settings">
+          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+          </svg>
+          <span class="sidebar-label">Settings</span>
+        </a>
+
+      </nav>
+
+      <div class="sidebar-footer">
         <button class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
-          <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+          <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
             <circle cx="12" cy="12" r="5"/>
             <line x1="12" y1="1" x2="12" y2="3"/>
             <line x1="12" y1="21" x2="12" y2="23"/>
@@ -54,12 +218,16 @@
             <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
             <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
           </svg>
-          <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+          <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
           </svg>
         </button>
+        <code class="made-by">&lt;devBy SamGreen/&gt;</code>
       </div>
-    </header>
+    </aside>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>
 
     <!-- Main Content -->
     <main id="main-content" class="main">
@@ -69,10 +237,7 @@
       </div>
     </main>
 
-    <!-- Footer -->
-    <footer class="footer">
-      <code class="made-by">&lt;devBy SamGreen/&gt;</code>
-    </footer>
+    <!-- Footer removed — branding moved to sidebar footer -->
   </div>
 
   <!-- Templates -->
@@ -491,12 +656,174 @@
     </div>
   </template>
 
+  <template id="missions-template">
+    <div class="page-container missions-page">
+      <div class="page-header">
+        <div>
+          <h1>Missions</h1>
+          <p class="subtitle">Saved mission definitions and run history</p>
+        </div>
+      </div>
+      <div class="missions-tabs">
+        <button class="missions-tab active" data-tab="definitions">Definitions</button>
+        <button class="missions-tab" data-tab="runs">Runs</button>
+      </div>
+      <div id="missions-list" class="missions-list"></div>
+    </div>
+  </template>
+
   <template id="error-template">
     <div class="error-container">
       <div class="error-icon">⚠️</div>
       <h2>Something went wrong</h2>
       <p class="error-message"></p>
       <a href="#/" class="btn btn-primary">Go to Dashboard</a>
+    </div>
+  </template>
+
+  <!-- ============================================================ -->
+  <!-- Projects Page Templates                                       -->
+  <!-- ============================================================ -->
+
+  <template id="projects-template">
+    <div class="page-container projects-page">
+      <div class="page-header projects-page-header">
+        <div class="projects-header-text">
+          <h1>Projects</h1>
+          <p class="subtitle">Manage local development servers</p>
+        </div>
+        <button class="btn btn-primary" id="add-project-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px;vertical-align:middle">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Add Project
+        </button>
+      </div>
+      <div id="projects-grid" class="projects-grid">
+        <!-- Project cards rendered here -->
+      </div>
+    </div>
+  </template>
+
+  <template id="project-card-template">
+    <div class="project-card">
+      <div class="project-card-header">
+        <div class="project-card-title-row">
+          <span class="project-status-dot"></span>
+          <h3 class="project-name"></h3>
+          <span class="project-status-pill">Stopped</span>
+        </div>
+        <div class="project-actions">
+          <button class="btn btn-sm project-btn-start" title="Start server">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+          </button>
+          <button class="btn btn-sm project-btn-stop" title="Stop server" style="display:none">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+          </button>
+          <button class="btn btn-sm project-btn-open" title="Open in browser" style="display:none">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+          </button>
+          <button class="btn btn-sm project-btn-logs" title="Toggle output log">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+          <button class="btn btn-sm project-btn-edit" title="Edit project">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
+          <button class="btn btn-sm project-btn-delete" title="Remove project">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="project-card-meta">
+        <div class="project-meta-row">
+          <span class="project-meta-label">path</span>
+          <code class="project-path"></code>
+        </div>
+        <div class="project-meta-row">
+          <span class="project-meta-label">cmd</span>
+          <code class="project-command"></code>
+        </div>
+        <div class="project-meta-row project-port-row" style="display:none">
+          <span class="project-meta-label">port</span>
+          <code class="project-port"></code>
+        </div>
+      </div>
+      <div class="project-log-panel" style="display:none">
+        <div class="project-log-header">
+          <span class="project-log-title">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;vertical-align:middle;opacity:0.6">
+              <rect x="2" y="3" width="20" height="14" rx="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            Output
+          </span>
+          <button class="project-log-clear" title="Clear output">Clear</button>
+        </div>
+        <div class="project-log-body">
+          <pre class="project-log-output"></pre>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template id="project-form-modal-template">
+    <div class="project-modal">
+      <div class="project-modal-backdrop"></div>
+      <div class="project-modal-dialog">
+        <div class="project-modal-header">
+          <h2 class="project-modal-title">Add Project</h2>
+          <button class="project-modal-close" aria-label="Close">&times;</button>
+        </div>
+        <form class="project-form" id="project-form" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="pf-name">Name <span class="form-required">*</span></label>
+            <input class="form-input" id="pf-name" name="name" type="text" required placeholder="My Dev Server" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="pf-path">Project Path <span class="form-required">*</span></label>
+            <input class="form-input form-input-mono" id="pf-path" name="path" type="text" required placeholder="/Users/you/projects/my-app" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="pf-command">Start Command <span class="form-required">*</span></label>
+            <input class="form-input form-input-mono" id="pf-command" name="command" type="text" required placeholder="npm run dev" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="form-row">
+            <div class="form-group form-group-half">
+              <label class="form-label" for="pf-port">Port</label>
+              <input class="form-input" id="pf-port" name="port" type="number" min="1" max="65535" placeholder="3000" />
+            </div>
+            <div class="form-group form-group-half">
+              <label class="form-label" for="pf-url">URL to Open</label>
+              <input class="form-input" id="pf-url" name="url" type="text" placeholder="http://localhost:3000" autocomplete="off" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-checkbox-label">
+              <input type="checkbox" id="pf-autoopen" name="autoOpen" class="form-checkbox" />
+              <span>Auto-open in browser when server starts</span>
+            </label>
+          </div>
+          <div class="form-error" id="pf-error" style="display:none"></div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="pf-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="pf-submit">Save Project</button>
+          </div>
+        </form>
+      </div>
     </div>
   </template>
 

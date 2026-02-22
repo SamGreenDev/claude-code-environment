@@ -8,7 +8,9 @@
 // ============================================================
 
 const STORAGE_KEYS = {
-  THEME: 'claude-ui-theme'  // Shared across all plugin UIs
+  THEME: 'claude-ui-theme',         // Shared across all plugin UIs
+  SIDEBAR_COLLAPSED: 'env-sidebar-collapsed',
+  SIDEBAR_GROUPS: 'env-sidebar-groups',
 };
 
 /**
@@ -28,6 +30,73 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+/**
+ * Show a themed confirm modal. Returns a Promise<boolean>.
+ */
+function showConfirmModal(message, { title = 'Confirm', confirmLabel = 'Delete', danger = true } = {}) {
+  return new Promise(resolve => {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <div class="modal-backdrop"></div>
+      <div class="modal-content confirm-modal-content">
+        <div class="modal-header">
+          <span class="modal-title">${escapeHtml(title)}</span>
+          <button class="modal-close" data-action="cancel">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p style="margin:0;color:var(--text-secondary);font-size:0.9rem;line-height:1.6">${escapeHtml(message)}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary confirm-btn-cancel" data-action="cancel">Cancel</button>
+          <button class="btn ${danger ? 'btn-danger' : 'btn-primary'} confirm-btn-ok" data-action="confirm">${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    const close = (result) => {
+      modal.remove();
+      resolve(result);
+    };
+    modal.querySelector('.modal-backdrop').addEventListener('click', () => close(false));
+    modal.querySelectorAll('[data-action="cancel"]').forEach(b => b.addEventListener('click', () => close(false)));
+    modal.querySelector('[data-action="confirm"]').addEventListener('click', () => close(true));
+    modal.addEventListener('keydown', e => { if (e.key === 'Escape') close(false); });
+    modal.querySelector('.confirm-btn-ok').focus();
+  });
+}
+
+/**
+ * Show a themed alert modal. Returns a Promise<void>.
+ */
+function showAlertModal(message, { title = 'Error' } = {}) {
+  return new Promise(resolve => {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <div class="modal-backdrop"></div>
+      <div class="modal-content confirm-modal-content">
+        <div class="modal-header">
+          <span class="modal-title">${escapeHtml(title)}</span>
+          <button class="modal-close" data-action="ok">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p style="margin:0;color:var(--text-secondary);font-size:0.9rem;line-height:1.6">${escapeHtml(message)}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary confirm-btn-ok" data-action="ok">OK</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    const close = () => { modal.remove(); resolve(); };
+    modal.querySelector('.modal-backdrop').addEventListener('click', close);
+    modal.querySelectorAll('[data-action="ok"]').forEach(b => b.addEventListener('click', close));
+    modal.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    modal.querySelector('.confirm-btn-ok').focus();
+  });
 }
 
 /**
@@ -103,6 +172,131 @@ function toggleTheme() {
 initializeTheme();
 
 // ============================================================
+// Sidebar Navigation
+// ============================================================
+
+// Persisted sidebar state (collapsed + group open/closed)
+const sidebarState = {
+  collapsed: localStorage.getItem(STORAGE_KEYS.SIDEBAR_COLLAPSED) === 'true',
+  groups: JSON.parse(
+    localStorage.getItem(STORAGE_KEYS.SIDEBAR_GROUPS) ||
+    '{"customizations":true,"missions":false}'
+  ),
+};
+
+/**
+ * Initialize sidebar: group toggles, collapse, mobile overlay.
+ * Called once on DOMContentLoaded.
+ */
+function initSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('sidebar-toggle');
+  const overlay = document.getElementById('sidebar-overlay');
+
+  if (!sidebar) return;
+
+  // Apply saved collapsed state (desktop only)
+  if (sidebarState.collapsed && window.innerWidth > 768) {
+    sidebar.classList.add('collapsed');
+  }
+
+  // Apply saved group expanded states
+  sidebar.querySelectorAll('.sidebar-group[data-group]').forEach(group => {
+    const name = group.dataset.group;
+    const btn = group.querySelector('.sidebar-group-toggle');
+    if (sidebarState.groups[name]) {
+      group.classList.add('expanded');
+      if (btn) btn.setAttribute('aria-expanded', 'true');
+    }
+  });
+
+  // Sidebar toggle button: collapse on desktop, open overlay on mobile
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      if (window.innerWidth <= 768) {
+        // Mobile: show sidebar as overlay
+        const isOpen = sidebar.classList.toggle('open');
+        if (overlay) {
+          overlay.classList.toggle('visible', isOpen);
+        }
+      } else {
+        // Desktop: toggle collapsed/icon-only mode
+        const isCollapsed = sidebar.classList.toggle('collapsed');
+        sidebarState.collapsed = isCollapsed;
+        localStorage.setItem(STORAGE_KEYS.SIDEBAR_COLLAPSED, String(isCollapsed));
+      }
+    });
+  }
+
+  // Close mobile sidebar when clicking overlay
+  if (overlay) {
+    overlay.addEventListener('click', () => {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('visible');
+    });
+  }
+
+  // Group expand/collapse toggles
+  sidebar.querySelectorAll('.sidebar-group[data-group]').forEach(group => {
+    const name = group.dataset.group;
+    const btn = group.querySelector('.sidebar-group-toggle');
+    if (!btn) return;
+
+    btn.addEventListener('click', () => {
+      const isExpanded = group.classList.toggle('expanded');
+      btn.setAttribute('aria-expanded', String(isExpanded));
+      sidebarState.groups[name] = isExpanded;
+      localStorage.setItem(STORAGE_KEYS.SIDEBAR_GROUPS, JSON.stringify(sidebarState.groups));
+    });
+  });
+}
+
+/**
+ * Update sidebar active state based on current route.
+ * Highlights the matching sidebar-link and auto-expands parent groups.
+ */
+function updateSidebarActiveState(routePath) {
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return;
+
+  // Clear all active states and group highlights
+  sidebar.querySelectorAll('.sidebar-link').forEach(link => {
+    link.classList.remove('active');
+  });
+  sidebar.querySelectorAll('.sidebar-group').forEach(group => {
+    group.classList.remove('has-active-child');
+  });
+
+  // Find matching sidebar link and activate it
+  const activeLink = sidebar.querySelector(`.sidebar-link[data-route="${routePath}"]`);
+  if (activeLink) {
+    activeLink.classList.add('active');
+
+    // If link is nested, expand its parent group and mark it as having an active child
+    const parentGroup = activeLink.closest('.sidebar-group[data-group]');
+    if (parentGroup) {
+      parentGroup.classList.add('has-active-child');
+      // Auto-expand if not already expanded
+      if (!parentGroup.classList.contains('expanded')) {
+        parentGroup.classList.add('expanded');
+        const btn = parentGroup.querySelector('.sidebar-group-toggle');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+        const name = parentGroup.dataset.group;
+        sidebarState.groups[name] = true;
+        localStorage.setItem(STORAGE_KEYS.SIDEBAR_GROUPS, JSON.stringify(sidebarState.groups));
+      }
+    }
+  }
+
+  // Close mobile overlay after navigation
+  if (window.innerWidth <= 768) {
+    sidebar.classList.remove('open');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (overlay) overlay.classList.remove('visible');
+  }
+}
+
+// ============================================================
 // Templates
 // ============================================================
 
@@ -129,9 +323,13 @@ const templates = {
   envSelect: document.getElementById('env-select-template'),
   detailModal: document.getElementById('detail-modal-template'),
   error: document.getElementById('error-template'),
+  missions: document.getElementById('missions-template'),
   missionBuilder: document.getElementById('mission-builder-template'),
   holonet: document.getElementById('holonet-template'),
   comms: document.getElementById('comms-template'),
+  projects: document.getElementById('projects-template'),
+  projectCard: document.getElementById('project-card-template'),
+  projectFormModal: document.getElementById('project-form-modal-template'),
 };
 
 // State
@@ -152,6 +350,8 @@ const state = {
   missionBuilder: null, // Mission Builder instance
   holonetCommand: null, // Holonet Command Center instance
   commsLog: null, // Comms Log instance
+  projects: [], // Project configs
+  projectsWs: null, // WebSocket for live project status/output
 };
 
 // API helpers
@@ -193,11 +393,8 @@ function handleRoute() {
   const hash = rawHash.split('?')[0]; // Strip query params before routing
   const [path, ...rest] = hash.split('/').filter(Boolean);
 
-  // Update active nav link (no nav link for dashboard since it's accessed via logo)
-  document.querySelectorAll('.nav-link').forEach(link => {
-    const route = link.dataset.route;
-    link.classList.toggle('active', route === path);
-  });
+  // Update sidebar active state
+  updateSidebarActiveState(path || 'dashboard');
 
   // Route to page
   state.currentRoute = path || 'dashboard';
@@ -221,6 +418,11 @@ function handleRoute() {
   if (path !== 'comms' && state.commsLog) {
     state.commsLog.destroy();
     state.commsLog = null;
+  }
+  // Clean up Projects WebSocket when navigating away
+  if (path !== 'projects' && state.projectsWs) {
+    state.projectsWs.close();
+    state.projectsWs = null;
   }
 
   switch (path) {
@@ -251,6 +453,9 @@ function handleRoute() {
     case 'settings':
       renderSettingsPage();
       break;
+    case 'missions':
+      renderMissionsPage();
+      break;
     case 'mission-builder':
       renderMissionBuilderPage();
       break;
@@ -259,6 +464,9 @@ function handleRoute() {
       break;
     case 'comms':
       renderCommsPage();
+      break;
+    case 'projects':
+      renderProjectsPage();
       break;
     default:
       renderDashboard();
@@ -1591,6 +1799,247 @@ function showError(container, message) {
 }
 
 // ============================================================
+// Missions List Page
+// ============================================================
+
+const MISSION_STATUS_COLORS = {
+  completed: { bg: 'rgba(45,106,79,0.15)', text: '#40916c', border: 'rgba(45,106,79,0.3)' },
+  running:   { bg: 'rgba(27,107,147,0.15)', text: '#4da8da', border: 'rgba(27,107,147,0.3)' },
+  failed:    { bg: 'rgba(199,70,52,0.15)', text: '#e07a5f', border: 'rgba(199,70,52,0.3)' },
+  aborted:   { bg: 'rgba(156,163,175,0.15)', text: '#9ca3af', border: 'rgba(156,163,175,0.3)' },
+  pending:   { bg: 'rgba(224,122,48,0.15)', text: '#e07a30', border: 'rgba(224,122,48,0.3)' },
+};
+
+async function renderMissionsPage() {
+  const main = document.getElementById('main-content');
+  showLoading(main);
+
+  try {
+    const [defsResp, runsResp] = await Promise.all([
+      api('/missions'),
+      api('/missions/runs'),
+    ]);
+    const definitions = defsResp.data || defsResp || [];
+    const runs = (runsResp.data || runsResp || []).sort((a, b) =>
+      new Date(b.startedAt || b.createdAt) - new Date(a.startedAt || a.createdAt)
+    );
+
+    const content = templates.missions.content.cloneNode(true);
+    const listEl = content.getElementById('missions-list');
+
+    // Render definitions by default
+    renderMissionDefinitions(listEl, definitions, runs);
+
+    main.innerHTML = '';
+    main.appendChild(content);
+
+    // Tab switching
+    document.querySelectorAll('.missions-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.missions-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const list = document.getElementById('missions-list');
+        if (tab.dataset.tab === 'definitions') {
+          renderMissionDefinitions(list, definitions, runs);
+        } else {
+          renderMissionRuns(list, runs, definitions);
+        }
+      });
+    });
+  } catch (err) {
+    showError(main, err.message || 'Failed to load missions');
+  }
+}
+
+function renderMissionDefinitions(container, definitions, runs) {
+  if (definitions.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state empty-state-centered">
+        <div class="empty-state-icon">🎯</div>
+        <h3>No missions yet</h3>
+        <p>Create a mission in the <a href="#/mission-builder">Builder</a></p>
+      </div>`;
+    return;
+  }
+
+  // Build run count map
+  const runCounts = {};
+  for (const r of runs) {
+    runCounts[r.missionId] = (runCounts[r.missionId] || 0) + 1;
+  }
+
+  container.innerHTML = definitions.map(m => {
+    const nodeCount = (m.nodes || []).length;
+    const edgeCount = (m.edges || []).length;
+    const rc = runCounts[m.id] || 0;
+    const created = m.createdAt ? new Date(m.createdAt).toLocaleDateString() : '—';
+    const updated = m.updatedAt ? new Date(m.updatedAt).toLocaleDateString() : '—';
+    const agentTypes = [...new Set((m.nodes || []).map(n => n.agentType))].join(', ') || 'none';
+
+    return `
+      <div class="mission-card" data-id="${m.id}">
+        <div class="mission-card-header">
+          <div class="mission-card-title">
+            <h3>${escapeHtml(m.name || 'Untitled Mission')}</h3>
+            <span class="mission-card-meta">${nodeCount} node${nodeCount !== 1 ? 's' : ''} · ${edgeCount} edge${edgeCount !== 1 ? 's' : ''} · ${rc} run${rc !== 1 ? 's' : ''}</span>
+          </div>
+          <div class="mission-card-actions">
+            <button class="btn btn-sm mission-btn-edit" title="Edit in Builder" data-id="${m.id}">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="btn btn-sm btn-danger mission-btn-delete" title="Delete mission" data-id="${m.id}">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </div>
+        </div>
+        ${m.description ? `<p class="mission-card-desc">${escapeHtml(m.description)}</p>` : ''}
+        <div class="mission-card-footer">
+          <span class="mission-card-agents">${escapeHtml(agentTypes)}</span>
+          <span class="mission-card-date">Created ${created} · Updated ${updated}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Wire up edit buttons
+  container.querySelectorAll('.mission-btn-edit').forEach(btn => {
+    btn.addEventListener('click', () => {
+      window.location.hash = `#/mission-builder?mission=${btn.dataset.id}`;
+    });
+  });
+
+  // Wire up delete buttons
+  container.querySelectorAll('.mission-btn-delete').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const card = btn.closest('.mission-card');
+      const name = card.querySelector('h3').textContent;
+      const ok = await showConfirmModal(`Delete mission "${name}"? This cannot be undone.`, { title: 'Delete Mission' });
+      if (!ok) return;
+      try {
+        await api(`/missions/${id}`, { method: 'DELETE' });
+        card.remove();
+        const list = document.getElementById('missions-list');
+        if (!list.querySelector('.mission-card')) {
+          list.innerHTML = `
+            <div class="empty-state empty-state-centered">
+              <div class="empty-state-icon">🎯</div>
+              <h3>No missions yet</h3>
+              <p>Create a mission in the <a href="#/mission-builder">Builder</a></p>
+            </div>`;
+        }
+      } catch (err) {
+        showAlertModal('Failed to delete mission: ' + err.message);
+      }
+    });
+  });
+}
+
+function renderMissionRuns(container, runs, definitions) {
+  if (runs.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state empty-state-centered">
+        <div class="empty-state-icon">🚀</div>
+        <h3>No runs yet</h3>
+        <p>Launch a mission from the <a href="#/holonet">Holonet</a></p>
+      </div>`;
+    return;
+  }
+
+  // Build mission name map
+  const missionNames = {};
+  for (const m of definitions) {
+    missionNames[m.id] = m.name || 'Untitled';
+  }
+
+  container.innerHTML = runs.map(r => {
+    const status = r.status || 'pending';
+    const colors = MISSION_STATUS_COLORS[status] || MISSION_STATUS_COLORS.pending;
+    const nodeStates = r.nodeStates || {};
+    const totalNodes = Object.keys(nodeStates).length;
+    const completedNodes = Object.values(nodeStates).filter(n => n.status === 'completed').length;
+    const failedNodes = Object.values(nodeStates).filter(n => n.status === 'failed').length;
+    const started = r.startedAt ? new Date(r.startedAt).toLocaleString() : '—';
+    const duration = r.startedAt && r.completedAt
+      ? formatDuration(new Date(r.completedAt) - new Date(r.startedAt))
+      : r.startedAt ? 'in progress' : '—';
+    const missionName = missionNames[r.missionId] || r.missionId?.slice(0, 16) || '—';
+    const filesCount = Object.values(nodeStates).reduce((sum, n) => sum + (n.files?.length || 0), 0);
+    const runName = r.name || r.id?.slice(0, 16) || '—';
+
+    return `
+      <div class="mission-run-card" data-id="${r.id}">
+        <div class="mission-run-header">
+          <div class="mission-run-title">
+            <h3>${escapeHtml(runName)}</h3>
+            <span class="mission-status-pill" style="background:${colors.bg};color:${colors.text};border:1px solid ${colors.border}">${status}</span>
+          </div>
+          <div class="mission-card-actions">
+            <button class="btn btn-sm mission-btn-view" title="View in Holonet" data-id="${r.id}">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            </button>
+            <button class="btn btn-sm btn-danger mission-btn-delete-run" title="Delete run" data-id="${r.id}">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="mission-run-meta">
+          <span>Mission: ${escapeHtml(missionName)}</span>
+          <span>${started}</span>
+          <span>${duration}</span>
+        </div>
+        <div class="mission-run-stats">
+          <span class="mission-run-stat">${completedNodes}/${totalNodes} nodes completed</span>
+          ${failedNodes ? `<span class="mission-run-stat stat-failed">${failedNodes} failed</span>` : ''}
+          <span class="mission-run-stat">${filesCount} file${filesCount !== 1 ? 's' : ''} produced</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Wire up view buttons
+  container.querySelectorAll('.mission-btn-view').forEach(btn => {
+    btn.addEventListener('click', () => {
+      window.location.hash = `#/holonet?run=${btn.dataset.id}`;
+    });
+  });
+
+  // Wire up delete buttons
+  container.querySelectorAll('.mission-btn-delete-run').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const card = btn.closest('.mission-run-card');
+      const ok = await showConfirmModal('Delete this run? This cannot be undone.', { title: 'Delete Run' });
+      if (!ok) return;
+      try {
+        await api(`/missions/runs/${id}`, { method: 'DELETE' });
+        card.remove();
+        const list = document.getElementById('missions-list');
+        if (!list.querySelector('.mission-run-card')) {
+          list.innerHTML = `
+            <div class="empty-state empty-state-centered">
+              <div class="empty-state-icon">🚀</div>
+              <h3>No runs yet</h3>
+              <p>Launch a mission from the <a href="#/holonet">Holonet</a></p>
+            </div>`;
+        }
+      } catch (err) {
+        showAlertModal('Failed to delete run: ' + err.message);
+      }
+    });
+  });
+}
+
+function formatDuration(ms) {
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  const remSecs = secs % 60;
+  if (mins < 60) return `${mins}m ${remSecs}s`;
+  const hrs = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  return `${hrs}h ${remMins}m`;
+}
+
+// ============================================================
 // Mission Builder Page
 // ============================================================
 function renderMissionBuilderPage() {
@@ -1650,6 +2099,540 @@ function renderCommsPage() {
   });
 }
 
+// ============================================================
+// Projects Page
+// ============================================================
+
+async function renderProjectsPage() {
+  const main = document.getElementById('main-content');
+  showLoading(main);
+
+  try {
+    const projects = await api('/projects');
+    state.projects = projects;
+
+    const content = templates.projects.content.cloneNode(true);
+    const grid = content.getElementById('projects-grid');
+
+    if (projects.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state empty-state-centered projects-empty">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1" class="empty-icon">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            <line x1="12" y1="11" x2="12" y2="17"/>
+            <line x1="9" y1="14" x2="15" y2="14"/>
+          </svg>
+          <h3>No projects yet</h3>
+          <p>Add a project to start managing local development servers.</p>
+        </div>
+      `;
+    } else {
+      projects.forEach(project => {
+        const card = createProjectCard(project);
+        grid.appendChild(card);
+      });
+    }
+
+    main.innerHTML = '';
+    main.appendChild(content);
+
+    // Wire up Add Project button
+    const addBtn = document.getElementById('add-project-btn');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => showProjectForm(null));
+    }
+
+    // Connect WebSocket for live updates
+    connectProjectsWs();
+  } catch (error) {
+    showError(main, error.message);
+  }
+}
+
+function createProjectCard(project) {
+  const card = templates.projectCard.content.cloneNode(true);
+  const cardEl = card.querySelector('.project-card');
+  cardEl.dataset.projectId = project.id;
+
+  // Title row
+  card.querySelector('.project-name').textContent = project.name;
+
+  // Path, command, port
+  card.querySelector('.project-path').textContent = project.path;
+  card.querySelector('.project-command').textContent = project.command;
+
+  const portRow = card.querySelector('.project-port-row');
+  if (project.port) {
+    card.querySelector('.project-port').textContent = project.port;
+    portRow.style.display = '';
+  }
+
+  // Initial status
+  const isRunning = project.status === 'running';
+  setProjectCardStatus(card, isRunning ? 'running' : 'stopped');
+
+  // Button wiring
+  card.querySelector('.project-btn-start').addEventListener('click', () => {
+    const latest = state.projects.find(p => p.id === project.id) || project;
+    startProject(latest.id, latest);
+  });
+  card.querySelector('.project-btn-stop').addEventListener('click', () => stopProject(project.id));
+  card.querySelector('.project-btn-open').addEventListener('click', () => {
+    const latest = state.projects.find(p => p.id === project.id) || project;
+    const url = latest.url || (latest.port ? `http://localhost:${latest.port}` : null);
+    if (url) window.open(url, '_blank');
+  });
+  card.querySelector('.project-btn-logs').addEventListener('click', () => toggleProjectLog(project.id));
+  card.querySelector('.project-btn-edit').addEventListener('click', async () => {
+    // Re-fetch from server to guarantee fresh data
+    try {
+      const all = await api('/projects');
+      state.projects = all;
+      const latest = all.find(p => p.id === project.id) || project;
+      showProjectForm(latest);
+    } catch {
+      showProjectForm(project);
+    }
+  });
+  card.querySelector('.project-btn-delete').addEventListener('click', () => confirmDeleteProject(project));
+
+  card.querySelector('.project-log-clear').addEventListener('click', () => {
+    const output = document.querySelector(`.project-card[data-project-id="${project.id}"] .project-log-output`);
+    if (output) output.innerHTML = '';
+  });
+
+  return card;
+}
+
+/**
+ * Update the status pill, dot, and action buttons for a project card
+ */
+function setProjectCardStatus(cardOrId, status) {
+  let cardEl;
+  if (typeof cardOrId === 'string') {
+    cardEl = document.querySelector(`.project-card[data-project-id="${cardOrId}"]`);
+  } else {
+    // DocumentFragment — find the .project-card inside
+    cardEl = cardOrId.querySelector ? cardOrId.querySelector('.project-card') : cardOrId;
+  }
+  if (!cardEl) return;
+
+  const dot = cardEl.querySelector('.project-status-dot');
+  const pill = cardEl.querySelector('.project-status-pill');
+  const btnStart = cardEl.querySelector('.project-btn-start');
+  const btnStop = cardEl.querySelector('.project-btn-stop');
+  const btnOpen = cardEl.querySelector('.project-btn-open');
+
+  // Remove all status classes
+  dot.classList.remove('running', 'stopped', 'error');
+  pill.classList.remove('pill-running', 'pill-stopped', 'pill-error');
+
+  if (status === 'running') {
+    dot.classList.add('running');
+    pill.textContent = 'Running';
+    pill.classList.add('pill-running');
+    btnStart.style.display = 'none';
+    btnStop.style.display = '';
+    btnOpen.style.display = '';
+  } else if (status === 'error') {
+    dot.classList.add('error');
+    pill.textContent = 'Error';
+    pill.classList.add('pill-error');
+    btnStart.style.display = '';
+    btnStop.style.display = 'none';
+    btnOpen.style.display = 'none';
+  } else {
+    dot.classList.add('stopped');
+    pill.textContent = 'Stopped';
+    pill.classList.add('pill-stopped');
+    btnStart.style.display = '';
+    btnStop.style.display = 'none';
+    btnOpen.style.display = 'none';
+  }
+}
+
+/**
+ * Toggle the log panel visibility for a project card
+ */
+function toggleProjectLog(projectId) {
+  const cardEl = document.querySelector(`.project-card[data-project-id="${projectId}"]`);
+  if (!cardEl) return;
+
+  const panel = cardEl.querySelector('.project-log-panel');
+  const logsBtn = cardEl.querySelector('.project-btn-logs');
+  const isOpen = panel.style.display !== 'none';
+
+  panel.style.display = isOpen ? 'none' : '';
+  logsBtn.classList.toggle('active', !isOpen);
+
+  // Scroll to bottom when opening
+  if (!isOpen) {
+    const logBody = panel.querySelector('.project-log-body');
+    logBody.scrollTop = logBody.scrollHeight;
+  }
+}
+
+/**
+ * Append a line to a project's log output
+ */
+function appendProjectLog(projectId, text, isStderr = false) {
+  const cardEl = document.querySelector(`.project-card[data-project-id="${projectId}"]`);
+  if (!cardEl) return;
+
+  const output = cardEl.querySelector('.project-log-output');
+  if (!output) return;
+
+  const span = document.createElement('span');
+  span.className = isStderr ? 'log-line log-stderr' : 'log-line log-stdout';
+  span.textContent = text;
+  output.appendChild(span);
+
+  // Auto-scroll if log panel is open
+  const panel = cardEl.querySelector('.project-log-panel');
+  if (panel && panel.style.display !== 'none') {
+    const logBody = panel.querySelector('.project-log-body');
+    logBody.scrollTop = logBody.scrollHeight;
+  }
+
+  // Auto-open log panel when there's output
+  if (panel && panel.style.display === 'none') {
+    panel.style.display = '';
+    cardEl.querySelector('.project-btn-logs').classList.add('active');
+  }
+
+  // Keep output manageable (remove old lines beyond 2000)
+  const lines = output.querySelectorAll('.log-line');
+  if (lines.length > 2000) {
+    for (let i = 0; i < lines.length - 1500; i++) {
+      lines[i].remove();
+    }
+  }
+}
+
+// ============================================================
+// Project CRUD Operations
+// ============================================================
+
+async function startProject(id, project) {
+  const cardEl = document.querySelector(`.project-card[data-project-id="${id}"]`);
+  const startBtn = cardEl?.querySelector('.project-btn-start');
+
+  if (startBtn) {
+    startBtn.disabled = true;
+    startBtn.style.opacity = '0.5';
+  }
+
+  try {
+    await api(`/projects/${id}/start`, { method: 'POST' });
+
+    // Open URL if autoOpen is set (stored on project object)
+    if (project?.autoOpen) {
+      const url = project.url || (project.port ? `http://localhost:${project.port}` : null);
+      if (url) setTimeout(() => window.open(url, '_blank'), 800);
+    }
+
+    showToast('Project starting…', 'success');
+  } catch (error) {
+    showToast(`Failed to start: ${error.message}`, 'error');
+    if (startBtn) {
+      startBtn.disabled = false;
+      startBtn.style.opacity = '';
+    }
+  }
+}
+
+async function stopProject(id) {
+  const cardEl = document.querySelector(`.project-card[data-project-id="${id}"]`);
+  const stopBtn = cardEl?.querySelector('.project-btn-stop');
+
+  if (stopBtn) {
+    stopBtn.disabled = true;
+    stopBtn.style.opacity = '0.5';
+  }
+
+  try {
+    await api(`/projects/${id}/stop`, { method: 'POST' });
+    showToast('Stopping server…', 'info');
+  } catch (error) {
+    showToast(`Failed to stop: ${error.message}`, 'error');
+    if (stopBtn) {
+      stopBtn.disabled = false;
+      stopBtn.style.opacity = '';
+    }
+  }
+}
+
+async function doCreateProject(data) {
+  return api('/projects', { method: 'POST', body: data });
+}
+
+async function doUpdateProject(id, data) {
+  return api(`/projects/${id}`, { method: 'PUT', body: data });
+}
+
+async function doDeleteProject(id) {
+  return api(`/projects/${id}`, { method: 'DELETE' });
+}
+
+// ============================================================
+// Project Form Modal
+// ============================================================
+
+function showProjectForm(project = null) {
+  // Remove any existing modal
+  hideProjectForm();
+
+  const modal = templates.projectFormModal.content.cloneNode(true);
+  const modalEl = modal.querySelector('.project-modal');
+  const form = modal.querySelector('#project-form');
+  const title = modal.querySelector('.project-modal-title');
+  const submitBtn = modal.querySelector('#pf-submit');
+  const cancelBtn = modal.querySelector('#pf-cancel');
+  const closeBtn = modal.querySelector('.project-modal-close');
+  const errorEl = modal.querySelector('#pf-error');
+
+  // Pre-fill for edit mode
+  if (project) {
+    title.textContent = 'Edit Project';
+    submitBtn.textContent = 'Save Changes';
+    modal.querySelector('#pf-name').value = project.name || '';
+    modal.querySelector('#pf-path').value = project.path || '';
+    modal.querySelector('#pf-command').value = project.command || '';
+    modal.querySelector('#pf-port').value = project.port || '';
+    modal.querySelector('#pf-url').value = project.url || '';
+    modal.querySelector('#pf-autoopen').checked = project.autoOpen || false;
+  }
+
+  const close = () => hideProjectForm();
+
+  cancelBtn.addEventListener('click', close);
+  closeBtn.addEventListener('click', close);
+  modal.querySelector('.project-modal-backdrop').addEventListener('click', close);
+
+  // Escape key
+  const onKeyDown = (e) => {
+    if (e.key === 'Escape') close();
+  };
+  document.addEventListener('keydown', onKeyDown);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // Validate required fields
+    const name = form.querySelector('#pf-name').value.trim();
+    const path = form.querySelector('#pf-path').value.trim();
+    const command = form.querySelector('#pf-command').value.trim();
+
+    if (!name || !path || !command) {
+      errorEl.textContent = 'Name, path, and command are required.';
+      errorEl.style.display = '';
+      return;
+    }
+
+    errorEl.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = project ? 'Saving…' : 'Adding…';
+
+    const portVal = form.querySelector('#pf-port').value.trim();
+    const data = {
+      name,
+      path,
+      command,
+      port: portVal ? parseInt(portVal, 10) : null,
+      url: form.querySelector('#pf-url').value.trim() || null,
+      autoOpen: form.querySelector('#pf-autoopen').checked,
+    };
+
+    try {
+      if (project) {
+        const updated = await doUpdateProject(project.id, data);
+        // Update the card in the DOM
+        updateProjectCardData(project.id, updated);
+        showToast('Project updated', 'success');
+      } else {
+        const created = await doCreateProject(data);
+        // Append new card
+        const grid = document.getElementById('projects-grid');
+        if (grid) {
+          const emptyState = grid.querySelector('.projects-empty');
+          if (emptyState) emptyState.remove();
+          const card = createProjectCard({ ...created, status: 'stopped' });
+          grid.appendChild(card);
+        }
+        showToast('Project added', 'success');
+      }
+      close();
+    } catch (error) {
+      errorEl.textContent = error.message;
+      errorEl.style.display = '';
+      submitBtn.disabled = false;
+      submitBtn.textContent = project ? 'Save Changes' : 'Save Project';
+    }
+  });
+
+  document.body.appendChild(modal);
+  state.modal = document.body.lastElementChild;
+  state._projectModalKeyHandler = onKeyDown;
+
+  // Focus first input
+  requestAnimationFrame(() => {
+    const firstInput = state.modal?.querySelector('input');
+    if (firstInput) firstInput.focus();
+  });
+}
+
+function hideProjectForm() {
+  if (state._projectModalKeyHandler) {
+    document.removeEventListener('keydown', state._projectModalKeyHandler);
+    state._projectModalKeyHandler = null;
+  }
+  const existing = document.querySelector('.project-modal');
+  if (existing) existing.remove();
+  if (state.modal?.classList?.contains('project-modal') || !state.modal?.classList) {
+    // Only clear state.modal if it's the project modal
+    const isProjectModal = document.body.contains(existing) === false;
+    if (!document.querySelector('.modal')) state.modal = null;
+  }
+}
+
+function updateProjectCardData(id, updated) {
+  const cardEl = document.querySelector(`.project-card[data-project-id="${id}"]`);
+  if (!cardEl) return;
+
+  cardEl.querySelector('.project-name').textContent = updated.name;
+  cardEl.querySelector('.project-path').textContent = updated.path;
+  cardEl.querySelector('.project-command').textContent = updated.command;
+
+  const portRow = cardEl.querySelector('.project-port-row');
+  if (updated.port) {
+    cardEl.querySelector('.project-port').textContent = updated.port;
+    portRow.style.display = '';
+  } else {
+    portRow.style.display = 'none';
+  }
+
+  // Update the in-memory project reference used by open/start buttons
+  const idx = state.projects.findIndex(p => p.id === id);
+  if (idx !== -1) Object.assign(state.projects[idx], updated);
+}
+
+function confirmDeleteProject(project) {
+  // Inline confirmation using the delete button itself
+  const cardEl = document.querySelector(`.project-card[data-project-id="${project.id}"]`);
+  if (!cardEl) return;
+
+  const deleteBtn = cardEl.querySelector('.project-btn-delete');
+  if (deleteBtn.dataset.confirming === 'true') return;
+
+  deleteBtn.dataset.confirming = 'true';
+  deleteBtn.title = 'Click again to confirm';
+  deleteBtn.style.color = 'var(--error)';
+  deleteBtn.style.borderColor = 'var(--error)';
+
+  const resetTimer = setTimeout(() => {
+    deleteBtn.dataset.confirming = '';
+    deleteBtn.title = 'Remove project';
+    deleteBtn.style.color = '';
+    deleteBtn.style.borderColor = '';
+  }, 3000);
+
+  const confirmHandler = async () => {
+    clearTimeout(resetTimer);
+    deleteBtn.removeEventListener('click', confirmHandler);
+
+    try {
+      await doDeleteProject(project.id);
+      cardEl.style.opacity = '0';
+      cardEl.style.transform = 'scale(0.95)';
+      cardEl.style.transition = 'opacity 200ms, transform 200ms';
+      setTimeout(() => {
+        cardEl.remove();
+        // Show empty state if no more cards
+        const grid = document.getElementById('projects-grid');
+        if (grid && grid.querySelectorAll('.project-card').length === 0) {
+          grid.innerHTML = `
+            <div class="empty-state empty-state-centered projects-empty">
+              <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1" class="empty-icon">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                <line x1="12" y1="11" x2="12" y2="17"/>
+                <line x1="9" y1="14" x2="15" y2="14"/>
+              </svg>
+              <h3>No projects yet</h3>
+              <p>Add a project to start managing local development servers.</p>
+            </div>
+          `;
+        }
+      }, 200);
+      showToast('Project removed', 'success');
+    } catch (error) {
+      showToast(`Failed to delete: ${error.message}`, 'error');
+      deleteBtn.dataset.confirming = '';
+      deleteBtn.style.color = '';
+      deleteBtn.style.borderColor = '';
+    }
+  };
+
+  // Re-wire click for confirmation (once)
+  deleteBtn.addEventListener('click', confirmHandler, { once: true });
+}
+
+// ============================================================
+// Projects WebSocket — live status & output
+// ============================================================
+
+function connectProjectsWs() {
+  if (state.projectsWs) return;
+
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${protocol}//${location.host}/ws/projects`);
+  state.projectsWs = ws;
+
+  ws.addEventListener('message', (e) => {
+    let msg;
+    try {
+      msg = JSON.parse(e.data);
+    } catch {
+      return;
+    }
+
+    switch (msg.type) {
+      case 'init':
+        // Sync statuses from server on connect
+        if (msg.statuses) {
+          for (const [id, info] of Object.entries(msg.statuses)) {
+            setProjectCardStatus(id, info.status);
+          }
+        }
+        break;
+
+      case 'project_status':
+        setProjectCardStatus(msg.projectId, msg.status);
+        // Re-enable any disabled buttons
+        const cardEl = document.querySelector(`.project-card[data-project-id="${msg.projectId}"]`);
+        if (cardEl) {
+          cardEl.querySelectorAll('.project-btn-start, .project-btn-stop').forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = '';
+          });
+        }
+        break;
+
+      case 'project_output':
+        // Detect stderr by checking if the backend tags it — otherwise treat as stdout
+        appendProjectLog(msg.projectId, msg.data, msg.stream === 'stderr');
+        break;
+    }
+  });
+
+  ws.addEventListener('error', () => {
+    // Silently fail — projects page still works, just no live updates
+  });
+
+  ws.addEventListener('close', () => {
+    if (state.projectsWs === ws) state.projectsWs = null;
+  });
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   // Setup theme toggle
@@ -1657,6 +2640,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (themeToggle) {
     themeToggle.addEventListener('click', toggleTheme);
   }
+
+  // Initialize sidebar navigation
+  initSidebar();
 
   // Initialize router
   initRouter();

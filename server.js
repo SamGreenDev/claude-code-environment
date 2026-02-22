@@ -10,6 +10,7 @@ import { createServer } from 'http';
 import { readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { WebSocketServer } from 'ws';
 
 import { createRouter, sendFile, sendJson, getContentType } from './lib/router.js';
 import { registerApiRoutes } from './lib/api-handlers.js';
@@ -19,6 +20,8 @@ import { startTeamWatcher } from './lib/team-watcher.js';
 import { registerMissionRoutes, handleMissionUpgrade, getMissionWss } from './lib/mission-api-handler.js';
 import { registerWizardRoutes } from './lib/wizard-api-handler.js';
 import { missionEngine } from './lib/mission-engine.js';
+import { registerProjectRoutes } from './lib/project-api-handler.js';
+import { addWsClient as addProjectWsClient, shutdownAll as shutdownProjects } from './lib/project-server-manager.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, 'public');
@@ -117,6 +120,7 @@ registerActivityRoutes(router);
 registerSessionRoutes(router);
 registerWizardRoutes(router);  // Must register before mission :id routes
 registerMissionRoutes(router);
+registerProjectRoutes(router);
 
 // Create HTTP server
 const server = createServer(async (req, res) => {
@@ -147,12 +151,26 @@ const server = createServer(async (req, res) => {
   }
 });
 
+// Projects WebSocket server (separate from activity WS)
+const projectsWss = new WebSocketServer({ noServer: true });
+projectsWss.on('connection', (ws) => {
+  console.log('[projects] WebSocket client connected');
+  addProjectWsClient(ws);
+});
+
+function handleProjectUpgrade(request, socket, head) {
+  projectsWss.handleUpgrade(request, socket, head, (ws) => {
+    projectsWss.emit('connection', ws, request);
+  });
+}
+
 // Start server
 server.listen(PORT, () => {
   // Initialize WebSocket for activity and session updates
   initWebSocket(server, {
     onSessionConnection: addSessionClient,
     onMissionUpgrade: handleMissionUpgrade,
+    onProjectUpgrade: handleProjectUpgrade,
   });
   getMissionWss(); // Initialize mission WebSocket and engine event subscriptions
   startHeartbeatChecker();
@@ -174,10 +192,12 @@ server.listen(PORT, () => {
   - Commands:     http://localhost:${PORT}/#/commands
   - Memory:       http://localhost:${PORT}/#/memory
   - Settings:     http://localhost:${PORT}/#/settings
+  - Projects:     http://localhost:${PORT}/#/projects
 
   WebSocket:      ws://localhost:${PORT}/ws/activity
   Sessions WS:    ws://localhost:${PORT}/ws/sessions
   Missions WS:    ws://localhost:${PORT}/ws/missions
+  Projects WS:    ws://localhost:${PORT}/ws/projects
 
   Auto-shutdown after 30 minutes of inactivity.
   Press Ctrl+C to stop.
@@ -198,7 +218,7 @@ process.on('uncaughtException', (error) => {
 });
 
 // Handle graceful shutdown
-process.on('SIGINT', () => {
+function gracefulShutdown() {
   console.log('\n[environment] Shutting down...');
 
   // Clear the auto-shutdown timer
@@ -206,6 +226,9 @@ process.on('SIGINT', () => {
     clearTimeout(shutdownTimer);
     shutdownTimer = null;
   }
+
+  // Stop all managed project child processes
+  shutdownProjects();
 
   // Clear activity timers and close WebSocket clients
   shutdownActivity();
@@ -220,4 +243,7 @@ process.on('SIGINT', () => {
     clearTimeout(forceTimer);
     process.exit(0);
   });
-});
+}
+
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
