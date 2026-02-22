@@ -856,7 +856,6 @@ class MissionBuilder {
     toolbar.appendChild(btn('📂 Load', '', () => this._load()));
     toolbar.appendChild(btn('🗑 Delete', 'mb-btn-danger', () => this._deleteMission()));
     toolbar.appendChild(sep());
-    toolbar.appendChild(btn('📋 Template', '', () => this._saveTemplate()));
     toolbar.appendChild(btn('✨ Wizard', '', () => this._openWizard()));
     toolbar.appendChild(btn('▶', 'mb-btn-primary', () => this._execute()));
 
@@ -2228,23 +2227,6 @@ class MissionBuilder {
       this._toast('Mission deleted', '#2D6A4F');
     } catch (err) {
       this._toast('Delete failed: ' + err.message, '#DC2626');
-    }
-  }
-
-  async _saveTemplate() {
-    const name = prompt('Template name:', this.missionName + ' (template)');
-    if (!name) return;
-    const data = { ...this.getMissionData(), name, isTemplate: true };
-
-    try {
-      await fetch('/api/missions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      this._toast('Template saved', '#2D6A4F');
-    } catch (err) {
-      this._toast('Template save failed', '#DC2626');
     }
   }
 

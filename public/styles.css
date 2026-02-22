@@ -3500,6 +3500,194 @@ body.sidebar-collapsed .main {
   color: var(--text-muted);
 }
 
+/* ============================================================ */
+/* List-Detail Layout (Agents, Skills, Commands)                */
+/* Reuses .memory-layout / .memory-sidebar / .memory-search     */
+/* ============================================================ */
+
+/* Sidebar list items */
+.list-detail-item {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+  border-left: 3px solid transparent;
+}
+
+.list-detail-item:hover {
+  background: var(--bg-hover);
+}
+
+.list-detail-item.active {
+  background: var(--bg-hover);
+  border-color: transparent;
+}
+
+.list-detail-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Type-specific accent colors */
+.list-detail-item--agent { border-left-color: var(--info); }
+.list-detail-item--agent.active { border-color: var(--info); border-left-color: var(--info); }
+.list-detail-item--skill { border-left-color: var(--warning); }
+.list-detail-item--skill.active { border-color: var(--warning); border-left-color: var(--warning); }
+.list-detail-item--command { border-left-color: var(--success); }
+.list-detail-item--command.active { border-color: var(--success); border-left-color: var(--success); }
+.list-detail-item--rule { border-left-color: var(--success); }
+.list-detail-item--rule.active { border-color: var(--success); border-left-color: var(--success); }
+
+.list-detail-item-name {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list-detail-item-sub {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list-detail-item-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Independent scrolling: sidebar and detail panel */
+.memory-layout > .memory-sidebar {
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
+  overflow-y: auto;
+}
+
+.memory-layout > .memory-sidebar .memory-project-list,
+.memory-layout > .memory-sidebar .list-detail-list {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Detail panel (right side) */
+.list-detail-panel {
+  min-height: 400px;
+  overflow-y: auto;
+}
+
+.list-detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.list-detail-empty .empty-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--space-md);
+  opacity: 0.5;
+}
+
+.list-detail-empty h3 {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.list-detail-empty p {
+  font-size: 0.875rem;
+  max-width: 400px;
+}
+
+/* Detail card wrapper */
+.list-detail-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-height: auto;
+  overflow: hidden;
+  position: relative;
+}
+
+.list-detail-card.agent-card {
+  border-left: 3px solid var(--info);
+  min-height: auto;
+}
+
+.list-detail-card.skill-card {
+  border-left: 3px solid var(--warning);
+  min-height: auto;
+}
+
+.list-detail-card.command-card {
+  border-left: 3px solid var(--success);
+}
+
+.list-detail-card.rule-card {
+  border-left: 3px solid var(--success);
+}
+
+.rule-card::before {
+  content: '§';
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: var(--success);
+  opacity: 0.3;
+}
+
+.command-card::before {
+  content: '$_';
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--success);
+  opacity: 0.3;
+}
+
+/* Markdown content in detail panel */
+.list-detail-markdown {
+  margin-top: var(--space-md);
+}
+
+/* Showing X of Y count */
+.list-detail-count {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  padding: var(--space-xs) var(--space-sm);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .main {
@@ -3511,6 +3699,7 @@ body.sidebar-collapsed .main {
   }
 
   .memory-sidebar {
+    position: static;
     max-height: 300px;
     border-right: none;
     padding-right: 0;

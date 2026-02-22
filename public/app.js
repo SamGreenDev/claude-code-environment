@@ -180,7 +180,7 @@ const sidebarState = {
   collapsed: localStorage.getItem(STORAGE_KEYS.SIDEBAR_COLLAPSED) === 'true',
   groups: JSON.parse(
     localStorage.getItem(STORAGE_KEYS.SIDEBAR_GROUPS) ||
-    '{"customizations":true,"missions":false}'
+    '{"customizations":true,"missions":false,"projects":true}'
   ),
 };
 
@@ -305,13 +305,7 @@ const templates = {
   dashboard: document.getElementById('dashboard-template'),
   statCard: document.getElementById('stat-card-template'),
   activity: document.getElementById('activity-template'),
-  agents: document.getElementById('agents-template'),
-  agentCard: document.getElementById('agent-card-template'),
-  skills: document.getElementById('skills-template'),
-  commands: document.getElementById('commands-template'),
-  skillCard: document.getElementById('skill-card-template'),
-  rules: document.getElementById('rules-template'),
-  ruleCard: document.getElementById('rule-card-template'),
+  listDetail: document.getElementById('list-detail-template'),
   plugins: document.getElementById('plugins-template'),
   pluginItem: document.getElementById('plugin-item-template'),
   mcpServers: document.getElementById('mcp-servers-template'),
@@ -560,184 +554,434 @@ async function renderActivityPage() {
   });
 }
 
-// Agents Page
-async function renderAgentsPage() {
+// ============================================================
+// Shared List-Detail Engine (Agents, Skills, Commands)
+// ============================================================
+
+/**
+ * Render a list-detail page using the shared template.
+ * @param {Object} config
+ * @param {string} config.title - Page title
+ * @param {string} config.subtitle - Page subtitle
+ * @param {string} config.emptyTitle - Empty state title
+ * @param {string} config.emptyDesc - Empty state description
+ * @param {string} config.apiEndpoint - API path e.g. '/agents'
+ * @param {string} config.stateKey - Key in state object
+ * @param {string} config.itemType - 'agent' | 'skill' | 'command'
+ * @param {Function} config.getSearchText - (item) => string for filtering
+ * @param {Function} config.buildListItem - (item) => HTMLElement for sidebar
+ * @param {Function} config.buildDetailPanel - (item) => HTMLElement for detail
+ */
+async function renderListDetailPage(config) {
   const main = document.getElementById('main-content');
   showLoading(main);
 
   try {
-    const { agents } = await api('/agents');
-    state.agents = agents;
+    const data = await api(config.apiEndpoint);
+    const items = data[config.stateKey];
+    state[config.stateKey] = items;
 
-    const content = templates.agents.content.cloneNode(true);
-    const grid = content.getElementById('agents-grid');
-
-    if (agents.length === 0) {
-      grid.innerHTML = '<p class="empty-state">No agents configured</p>';
-    } else {
-      agents.forEach(agent => {
-        const card = createAgentCard(agent);
-        grid.appendChild(card);
-      });
-    }
+    const content = templates.listDetail.content.cloneNode(true);
+    content.querySelector('.list-detail-title').textContent = config.title;
+    content.querySelector('.list-detail-subtitle').textContent = config.subtitle;
+    content.querySelector('.list-detail-empty-title').textContent = config.emptyTitle;
+    content.querySelector('.list-detail-empty-desc').textContent = config.emptyDesc;
+    content.querySelector('.list-detail-search').setAttribute('placeholder', `Filter ${config.stateKey}...`);
 
     main.innerHTML = '';
     main.appendChild(content);
+
+    const listEl = main.querySelector('.list-detail-list');
+    const panelEl = main.querySelector('.list-detail-panel');
+    const searchInput = main.querySelector('.list-detail-search');
+    const countEl = main.querySelector('.list-detail-count');
+    let selectedItem = null;
+
+    function updateCount(shown, total) {
+      countEl.textContent = shown === total ? `${total} items` : `Showing ${shown} of ${total}`;
+    }
+
+    function selectItem(item, el) {
+      selectedItem = item;
+      listEl.querySelectorAll('.list-detail-item').forEach(i => i.classList.remove('active'));
+      el.classList.add('active');
+      panelEl.innerHTML = '';
+      panelEl.appendChild(config.buildDetailPanel(item));
+    }
+
+    function renderList(filter = '') {
+      const lowerFilter = filter.toLowerCase();
+      listEl.innerHTML = '';
+      let shown = 0;
+      let firstEl = null;
+      let selectedStillVisible = false;
+
+      items.forEach(item => {
+        const searchText = config.getSearchText(item).toLowerCase();
+        if (lowerFilter && !searchText.includes(lowerFilter)) return;
+
+        shown++;
+        const el = config.buildListItem(item);
+        el.setAttribute('tabindex', '0');
+
+        if (selectedItem === item) {
+          el.classList.add('active');
+          selectedStillVisible = true;
+        }
+
+        el.addEventListener('click', () => selectItem(item, el));
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            selectItem(item, el);
+          }
+        });
+
+        listEl.appendChild(el);
+        if (!firstEl) firstEl = { item, el };
+      });
+
+      updateCount(shown, items.length);
+
+      // Auto-select first item if nothing selected or selection filtered out
+      if (!selectedStillVisible && firstEl) {
+        selectItem(firstEl.item, firstEl.el);
+      }
+    }
+
+    searchInput.addEventListener('input', () => {
+      renderList(searchInput.value);
+    });
+
+    renderList();
+
   } catch (error) {
     showError(main, error.message);
   }
 }
 
-function createAgentCard(agent) {
-  const card = templates.agentCard.content.cloneNode(true);
-  card.querySelector('.card-title').textContent = agent.title;
+// --- Agent builders ---
+function buildAgentListItem(agent) {
+  const el = document.createElement('div');
+  el.className = 'list-detail-item list-detail-item--agent';
+  const name = document.createElement('div');
+  name.className = 'list-detail-item-name';
+  name.textContent = agent.title;
+  el.appendChild(name);
 
-  // Set description, with fallback for plugin agents
+  if (agent.plugin) {
+    const sub = document.createElement('div');
+    sub.className = 'list-detail-item-sub';
+    sub.textContent = agent.plugin;
+    el.appendChild(sub);
+  }
+
+  if (agent.description) {
+    const desc = document.createElement('div');
+    desc.className = 'list-detail-item-desc';
+    desc.textContent = agent.description;
+    el.appendChild(desc);
+  }
+  return el;
+}
+
+function buildAgentDetailPanel(agent) {
+  const wrapper = document.createElement('div');
+  const card = document.createElement('div');
+  card.className = 'list-detail-card agent-card';
+
+  const header = document.createElement('div');
+  header.className = 'card-header';
+  const title = document.createElement('h3');
+  title.className = 'card-title';
+  title.textContent = agent.title;
+  header.appendChild(title);
+
+  if (agent.plugin) {
+    const badge = document.createElement('span');
+    badge.className = 'plugin-badge';
+    badge.textContent = agent.plugin;
+    badge.style.display = 'inline-block';
+    header.appendChild(badge);
+  }
+  card.appendChild(header);
+
   let description = agent.description;
   if (!description && agent.plugin) {
     description = `Agent provided by the ${agent.plugin} plugin`;
   }
-  card.querySelector('.card-description').textContent = description || 'No description';
+  const desc = document.createElement('p');
+  desc.className = 'card-description';
+  desc.textContent = description || 'No description';
+  card.appendChild(desc);
 
-  // Display plugin badge if agent comes from a plugin
-  const pluginBadge = card.querySelector('.plugin-badge');
-  if (pluginBadge && agent.plugin) {
-    pluginBadge.textContent = agent.plugin;
-    pluginBadge.style.display = 'inline-block';
-  }
-
-  const whenList = card.querySelector('.when-list');
   if (agent.whenToUse && agent.whenToUse.length > 0) {
-    agent.whenToUse.slice(0, 3).forEach(item => {
+    const meta = document.createElement('div');
+    meta.className = 'card-meta';
+    const label = document.createElement('span');
+    label.className = 'meta-label';
+    label.textContent = 'When to use:';
+    meta.appendChild(label);
+    const ul = document.createElement('ul');
+    ul.className = 'when-list';
+    agent.whenToUse.forEach(item => {
       const li = document.createElement('li');
       li.textContent = item;
-      whenList.appendChild(li);
+      ul.appendChild(li);
     });
-  } else {
-    whenList.parentElement.style.display = 'none';
+    meta.appendChild(ul);
+    card.appendChild(meta);
   }
 
-  card.querySelector('.view-details').addEventListener('click', () => {
-    showDetailModal(agent.title, agent.content);
-  });
+  wrapper.appendChild(card);
 
-  return card;
-}
-
-// Skills Page
-async function renderSkillsPage() {
-  const main = document.getElementById('main-content');
-  showLoading(main);
-
-  try {
-    const { skills } = await api('/skills');
-    state.skills = skills;
-
-    const content = templates.skills.content.cloneNode(true);
-    const skillsGrid = content.getElementById('skills-grid');
-
-    if (skills.length === 0) {
-      skillsGrid.innerHTML = '<p class="empty-state">No skills configured</p>';
-    } else {
-      skills.forEach(skill => {
-        const card = createSkillCard(skill);
-        skillsGrid.appendChild(card);
-      });
-    }
-
-    main.innerHTML = '';
-    main.appendChild(content);
-  } catch (error) {
-    showError(main, error.message);
+  if (agent.content) {
+    const md = document.createElement('div');
+    md.className = 'list-detail-markdown markdown-body';
+    md.innerHTML = sanitizeHtml(marked.parse(agent.content));
+    wrapper.appendChild(md);
   }
+
+  return wrapper;
 }
 
-// Commands Page
-async function renderCommandsPage() {
-  const main = document.getElementById('main-content');
-  showLoading(main);
+// --- Skill builders ---
+function buildSkillListItem(skill) {
+  const el = document.createElement('div');
+  el.className = 'list-detail-item list-detail-item--skill';
+  const name = document.createElement('div');
+  name.className = 'list-detail-item-name';
+  name.textContent = skill.title;
+  el.appendChild(name);
 
-  try {
-    const { commands } = await api('/commands');
-    state.commands = commands;
+  const sub = document.createElement('div');
+  sub.className = 'list-detail-item-sub';
+  sub.textContent = skill.command;
+  el.appendChild(sub);
 
-    const content = templates.commands.content.cloneNode(true);
-    const commandsGrid = content.getElementById('commands-grid');
-
-    if (commands.length === 0) {
-      commandsGrid.innerHTML = '<p class="empty-state">No commands configured</p>';
-    } else {
-      commands.forEach(command => {
-        const card = createSkillCard(command);
-        commandsGrid.appendChild(card);
-      });
-    }
-
-    main.innerHTML = '';
-    main.appendChild(content);
-  } catch (error) {
-    showError(main, error.message);
+  if (skill.description) {
+    const desc = document.createElement('div');
+    desc.className = 'list-detail-item-desc';
+    desc.textContent = skill.description;
+    el.appendChild(desc);
   }
+  return el;
 }
 
-function createSkillCard(skill) {
-  const card = templates.skillCard.content.cloneNode(true);
-  card.querySelector('.command-badge').textContent = skill.command;
-  card.querySelector('.card-title').textContent = skill.title;
-  card.querySelector('.card-description').textContent = skill.description || 'No description';
+function buildSkillDetailPanel(skill) {
+  const wrapper = document.createElement('div');
+  const card = document.createElement('div');
+  card.className = 'list-detail-card skill-card';
 
-  // Display author badge if present
-  const authorBadge = card.querySelector('.author-badge');
-  if (authorBadge && skill.author) {
+  const header = document.createElement('div');
+  header.className = 'card-header';
+  const badge = document.createElement('code');
+  badge.className = 'command-badge';
+  badge.textContent = skill.command;
+  header.appendChild(badge);
+  const title = document.createElement('h3');
+  title.className = 'card-title';
+  title.textContent = skill.title;
+  header.appendChild(title);
+  card.appendChild(header);
+
+  const desc = document.createElement('p');
+  desc.className = 'card-description';
+  desc.textContent = skill.description || 'No description';
+  card.appendChild(desc);
+
+  if (skill.author) {
+    const authorBadge = document.createElement('span');
+    authorBadge.className = 'author-badge';
     authorBadge.textContent = skill.author;
-    authorBadge.style.display = 'inline-block';
+    card.appendChild(authorBadge);
   }
 
-  card.querySelector('.view-details').addEventListener('click', () => {
-    showDetailModal(skill.title, skill.content);
-  });
+  wrapper.appendChild(card);
 
-  return card;
-}
-
-// Rules Page
-async function renderRulesPage() {
-  const main = document.getElementById('main-content');
-  showLoading(main);
-
-  try {
-    const { rules } = await api('/rules');
-    state.rules = rules;
-
-    const content = templates.rules.content.cloneNode(true);
-    const grid = content.getElementById('rules-grid');
-
-    if (rules.length === 0) {
-      grid.innerHTML = '<p class="empty-state">No rules configured</p>';
-    } else {
-      rules.forEach(rule => {
-        const card = createRuleCard(rule);
-        grid.appendChild(card);
-      });
-    }
-
-    main.innerHTML = '';
-    main.appendChild(content);
-  } catch (error) {
-    showError(main, error.message);
+  if (skill.content) {
+    const md = document.createElement('div');
+    md.className = 'list-detail-markdown markdown-body';
+    md.innerHTML = sanitizeHtml(marked.parse(skill.content));
+    wrapper.appendChild(md);
   }
+
+  return wrapper;
 }
 
-function createRuleCard(rule) {
-  const card = templates.ruleCard.content.cloneNode(true);
-  card.querySelector('.card-title').textContent = rule.title;
-  card.querySelector('.sections-count').textContent = `${rule.sections} sections`;
+// --- Command builders ---
+function buildCommandListItem(command) {
+  const el = document.createElement('div');
+  el.className = 'list-detail-item list-detail-item--command';
+  const name = document.createElement('div');
+  name.className = 'list-detail-item-name';
+  name.textContent = command.title;
+  el.appendChild(name);
 
-  card.querySelector('.view-details').addEventListener('click', () => {
-    showDetailModal(rule.title, rule.content);
+  const sub = document.createElement('div');
+  sub.className = 'list-detail-item-sub';
+  sub.textContent = command.command;
+  el.appendChild(sub);
+
+  if (command.description) {
+    const desc = document.createElement('div');
+    desc.className = 'list-detail-item-desc';
+    desc.textContent = command.description;
+    el.appendChild(desc);
+  }
+  return el;
+}
+
+function buildCommandDetailPanel(command) {
+  const wrapper = document.createElement('div');
+  const card = document.createElement('div');
+  card.className = 'list-detail-card command-card';
+
+  const header = document.createElement('div');
+  header.className = 'card-header';
+  const badge = document.createElement('code');
+  badge.className = 'command-badge';
+  badge.textContent = command.command;
+  header.appendChild(badge);
+  const title = document.createElement('h3');
+  title.className = 'card-title';
+  title.textContent = command.title;
+  header.appendChild(title);
+  card.appendChild(header);
+
+  const desc = document.createElement('p');
+  desc.className = 'card-description';
+  desc.textContent = command.description || 'No description';
+  card.appendChild(desc);
+
+  if (command.author) {
+    const authorBadge = document.createElement('span');
+    authorBadge.className = 'author-badge';
+    authorBadge.textContent = command.author;
+    card.appendChild(authorBadge);
+  }
+
+  wrapper.appendChild(card);
+
+  if (command.content) {
+    const md = document.createElement('div');
+    md.className = 'list-detail-markdown markdown-body';
+    md.innerHTML = sanitizeHtml(marked.parse(command.content));
+    wrapper.appendChild(md);
+  }
+
+  return wrapper;
+}
+
+// --- Page render wrappers ---
+function renderAgentsPage() {
+  return renderListDetailPage({
+    title: 'Sub-Agents',
+    subtitle: 'Specialized agents for task delegation',
+    emptyTitle: 'Select an agent',
+    emptyDesc: 'Choose an agent from the sidebar to view its details and configuration.',
+    apiEndpoint: '/agents',
+    stateKey: 'agents',
+    itemType: 'agent',
+    getSearchText: (a) => `${a.title} ${a.description || ''} ${a.plugin || ''}`,
+    buildListItem: buildAgentListItem,
+    buildDetailPanel: buildAgentDetailPanel,
   });
+}
 
-  return card;
+function renderSkillsPage() {
+  return renderListDetailPage({
+    title: 'Skills',
+    subtitle: 'Comprehensive workflow skills invoked via slash commands',
+    emptyTitle: 'Select a skill',
+    emptyDesc: 'Choose a skill from the sidebar to view its details and documentation.',
+    apiEndpoint: '/skills',
+    stateKey: 'skills',
+    itemType: 'skill',
+    getSearchText: (s) => `${s.title} ${s.command} ${s.description || ''} ${s.author || ''}`,
+    buildListItem: buildSkillListItem,
+    buildDetailPanel: buildSkillDetailPanel,
+  });
+}
+
+function renderCommandsPage() {
+  return renderListDetailPage({
+    title: 'Commands',
+    subtitle: 'Quick slash commands for common actions',
+    emptyTitle: 'Select a command',
+    emptyDesc: 'Choose a command from the sidebar to view its details.',
+    apiEndpoint: '/commands',
+    stateKey: 'commands',
+    itemType: 'command',
+    getSearchText: (c) => `${c.title} ${c.command} ${c.description || ''}`,
+    buildListItem: buildCommandListItem,
+    buildDetailPanel: buildCommandDetailPanel,
+  });
+}
+
+// --- Rule builders ---
+function buildRuleListItem(rule) {
+  const el = document.createElement('div');
+  el.className = 'list-detail-item list-detail-item--rule';
+  const name = document.createElement('div');
+  name.className = 'list-detail-item-name';
+  name.textContent = rule.title;
+  el.appendChild(name);
+
+  const sub = document.createElement('div');
+  sub.className = 'list-detail-item-sub';
+  sub.textContent = `${rule.sections} sections`;
+  el.appendChild(sub);
+
+  return el;
+}
+
+function buildRuleDetailPanel(rule) {
+  const wrapper = document.createElement('div');
+  const card = document.createElement('div');
+  card.className = 'list-detail-card rule-card';
+
+  const header = document.createElement('div');
+  header.className = 'card-header';
+  const title = document.createElement('h3');
+  title.className = 'card-title';
+  title.textContent = rule.title;
+  header.appendChild(title);
+  card.appendChild(header);
+
+  const meta = document.createElement('div');
+  meta.className = 'card-meta';
+  const count = document.createElement('span');
+  count.className = 'sections-count';
+  count.textContent = `${rule.sections} sections`;
+  meta.appendChild(count);
+  card.appendChild(meta);
+
+  wrapper.appendChild(card);
+
+  if (rule.content) {
+    const md = document.createElement('div');
+    md.className = 'list-detail-markdown markdown-body';
+    md.innerHTML = sanitizeHtml(marked.parse(rule.content));
+    wrapper.appendChild(md);
+  }
+
+  return wrapper;
+}
+
+function renderRulesPage() {
+  return renderListDetailPage({
+    title: 'Rules',
+    subtitle: 'Coding standards and guidelines',
+    emptyTitle: 'Select a rule',
+    emptyDesc: 'Choose a rule from the sidebar to view its content.',
+    apiEndpoint: '/rules',
+    stateKey: 'rules',
+    itemType: 'rule',
+    getSearchText: (r) => `${r.title}`,
+    buildListItem: buildRuleListItem,
+    buildDetailPanel: buildRuleDetailPanel,
+  });
 }
 
 // Plugins Page

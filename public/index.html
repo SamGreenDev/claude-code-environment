@@ -94,40 +94,24 @@
               </svg>
               <span class="sidebar-label">Rules</span>
             </a>
+            <a href="#/plugins" class="sidebar-link sidebar-link-nested" data-route="plugins">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                <line x1="7" y1="7" x2="7.01" y2="7"/>
+              </svg>
+              <span class="sidebar-label">Plugins</span>
+            </a>
+            <a href="#/mcp-servers" class="sidebar-link sidebar-link-nested" data-route="mcp-servers">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                <line x1="6" y1="6" x2="6.01" y2="6"/>
+                <line x1="6" y1="18" x2="6.01" y2="18"/>
+              </svg>
+              <span class="sidebar-label">MCP Servers</span>
+            </a>
           </div>
         </div>
-
-        <div class="sidebar-divider"></div>
-
-        <!-- Plugins -->
-        <a href="#/plugins" class="sidebar-link" data-route="plugins">
-          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-            <line x1="7" y1="7" x2="7.01" y2="7"/>
-          </svg>
-          <span class="sidebar-label">Plugins</span>
-        </a>
-
-        <!-- MCP Servers -->
-        <a href="#/mcp-servers" class="sidebar-link" data-route="mcp-servers">
-          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
-            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-            <line x1="6" y1="6" x2="6.01" y2="6"/>
-            <line x1="6" y1="18" x2="6.01" y2="18"/>
-          </svg>
-          <span class="sidebar-label">MCP Servers</span>
-        </a>
-
-        <!-- Memory -->
-        <a href="#/memory" class="sidebar-link" data-route="memory">
-          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <ellipse cx="12" cy="5" rx="9" ry="3"/>
-            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-          </svg>
-          <span class="sidebar-label">Memory</span>
-        </a>
 
         <div class="sidebar-divider"></div>
 
@@ -183,13 +167,36 @@
 
         <div class="sidebar-divider"></div>
 
-        <!-- Projects -->
-        <a href="#/projects" class="sidebar-link" data-route="projects">
-          <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-          </svg>
-          <span class="sidebar-label">Projects</span>
-        </a>
+        <!-- Projects group -->
+        <div class="sidebar-group" data-group="projects">
+          <button class="sidebar-group-toggle" aria-expanded="false">
+            <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span class="sidebar-label">Projects</span>
+            <svg class="sidebar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+          <div class="sidebar-group-items">
+            <a href="#/projects" class="sidebar-link sidebar-link-nested" data-route="projects">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+              <span class="sidebar-label">Servers</span>
+            </a>
+            <a href="#/memory" class="sidebar-link sidebar-link-nested" data-route="memory">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+              </svg>
+              <span class="sidebar-label">Memory</span>
+            </a>
+          </div>
+        </div>
 
         <div class="sidebar-spacer"></div>
 
@@ -287,94 +294,41 @@
     </div>
   </template>
 
-  <template id="agents-template">
+  <template id="list-detail-template">
     <div class="page-container">
       <div class="page-header">
-        <h1>Sub-Agents</h1>
-        <p class="subtitle">Specialized agents for task delegation</p>
+        <h1 class="list-detail-title"></h1>
+        <p class="subtitle list-detail-subtitle"></p>
       </div>
-      <div class="cards-grid" id="agents-grid">
-        <!-- Agent cards -->
-      </div>
-    </div>
-  </template>
-
-  <template id="agent-card-template">
-    <div class="agent-card">
-      <div class="card-header">
-        <h3 class="card-title"></h3>
-        <span class="plugin-badge" style="display: none;"></span>
-      </div>
-      <p class="card-description"></p>
-      <div class="card-meta">
-        <span class="meta-label">When to use:</span>
-        <ul class="when-list"></ul>
-      </div>
-      <button class="btn btn-secondary view-details">View Details</button>
-    </div>
-  </template>
-
-  <template id="skills-template">
-    <div class="page-container">
-      <div class="page-header">
-        <h1>Skills</h1>
-        <p class="subtitle">Comprehensive workflow skills invoked via slash commands</p>
-      </div>
-      <div class="cards-grid" id="skills-grid">
-        <!-- Skill cards -->
+      <div class="memory-layout">
+        <aside class="memory-sidebar">
+          <div class="memory-search">
+            <div class="search-container">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input type="text" class="list-detail-search" placeholder="Filter..." autocomplete="off" />
+            </div>
+          </div>
+          <div class="list-detail-count"></div>
+          <div class="memory-project-list list-detail-list">
+            <!-- List items -->
+          </div>
+        </aside>
+        <div class="list-detail-panel">
+          <div class="list-detail-empty">
+            <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+            </svg>
+            <h3 class="list-detail-empty-title">Select an item</h3>
+            <p class="list-detail-empty-desc">Choose from the sidebar to view details.</p>
+          </div>
+        </div>
       </div>
     </div>
   </template>
 
-  <template id="commands-template">
-    <div class="page-container">
-      <div class="page-header">
-        <h1>Commands</h1>
-        <p class="subtitle">Quick slash commands for common actions</p>
-      </div>
-      <div class="cards-grid" id="commands-grid">
-        <!-- Command cards -->
-      </div>
-    </div>
-  </template>
-
-  <template id="skill-card-template">
-    <div class="skill-card">
-      <div class="card-header">
-        <code class="command-badge"></code>
-        <h3 class="card-title"></h3>
-      </div>
-      <p class="card-description"></p>
-      <div class="card-footer">
-        <span class="author-badge" style="display: none;"></span>
-        <button class="btn btn-secondary view-details">View Details</button>
-      </div>
-    </div>
-  </template>
-
-  <template id="rules-template">
-    <div class="page-container">
-      <div class="page-header">
-        <h1>Rules</h1>
-        <p class="subtitle">Coding standards and guidelines</p>
-      </div>
-      <div class="cards-grid" id="rules-grid">
-        <!-- Rule cards -->
-      </div>
-    </div>
-  </template>
-
-  <template id="rule-card-template">
-    <div class="rule-card">
-      <div class="card-header">
-        <h3 class="card-title"></h3>
-      </div>
-      <div class="card-meta">
-        <span class="sections-count"></span>
-      </div>
-      <button class="btn btn-secondary view-details">View Details</button>
-    </div>
-  </template>
 
   <template id="plugins-template">
     <div class="page-container">
