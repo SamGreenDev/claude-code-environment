@@ -1486,7 +1486,7 @@ async function renderSettingsPage() {
       api('/project'),
       api('/plugins'),
     ]);
-    const installedPlugins = new Set(plugins.map(p => p.id.split('@')[0]));
+    const installedPlugins = new Set((plugins.plugins || []).map(p => p.id.split('@')[0]));
 
     state.groupedHooks = groupedHooksRes;
     const settings = settingsRes.settings;
