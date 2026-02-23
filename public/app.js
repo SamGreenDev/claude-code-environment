@@ -1480,11 +1480,13 @@ async function renderSettingsPage() {
   showLoading(main);
 
   try {
-    const [settingsRes, groupedHooksRes, projectRes] = await Promise.all([
+    const [settingsRes, groupedHooksRes, projectRes, plugins] = await Promise.all([
       api('/settings'),
       api('/hooks?grouped=true'),
       api('/project'),
+      api('/plugins'),
     ]);
+    const installedPlugins = new Set(plugins.map(p => p.id.split('@')[0]));
 
     state.groupedHooks = groupedHooksRes;
     const settings = settingsRes.settings;
@@ -1548,9 +1550,9 @@ async function renderSettingsPage() {
       // Clear and render user env vars
       envVars.innerHTML = '';
       const env = settings.env || {};
-      const envSchema = schema?.env || {};
+      const envSchema = filterEnvSchema(schema?.env || {}, installedPlugins);
       const defaults = {
-        ANALYSIS_LEVEL: 'code-review',
+        ANALYSIS_LEVEL: 'issue-resolver',
         CRITICAL_ISSUE_MODE: 'warn',
         AUTO_DOCUMENT: 'true',
         UPDATE_PRACTICES: 'true',
@@ -1633,7 +1635,7 @@ async function renderSettingsPage() {
         // Clear and render project env vars
         envVars.innerHTML = '';
         const mergedEnv = projectEnvRes.merged || { ...projectEnvRes.env, ...projectEnvRes.localEnv };
-        const envSchema = schema?.env || {};
+        const envSchema = filterEnvSchema(schema?.env || {}, installedPlugins);
 
         if (Object.keys(envSchema).length === 0) {
           envVars.innerHTML = '<div class="empty-state-small">No environment variables defined</div>';
@@ -1718,6 +1720,14 @@ async function renderSettingsPage() {
   } catch (error) {
     showError(main, error.message);
   }
+}
+
+function filterEnvSchema(schema, installedPlugins) {
+  return Object.fromEntries(
+    Object.entries(schema).filter(([, config]) =>
+      !config.requiredPlugin || installedPlugins.has(config.requiredPlugin)
+    )
+  );
 }
 
 function renderBooleanSetting(container, key, config, value, level = 'user') {
