@@ -6,7 +6,7 @@ set -euo pipefail
 
 COMPONENT_NAME="environment"
 COMPONENT_TYPE="plugin"
-COMPONENT_VERSION="1.1.0"
+COMPONENT_VERSION="1.1.5"
 
 TARGET_DIR="$HOME/.claude/plugins/local/$COMPONENT_NAME"
 SKILLS_DIR="$HOME/.claude/skills"
@@ -190,12 +190,12 @@ do_install() {
   # Create target directory and copy files
   mkdir -p "$TARGET_DIR"
 
-  # Copy everything except installer files and node_modules
+  # Copy everything except installer files
   for item in "$SCRIPT_DIR"/*; do
     local base
     base="$(basename "$item")"
     case "$base" in
-      install|install.sh|install.mjs|install.cmd|INSTALL.md|DEPLOY_NOW.md|DEPLOYMENT_INSTRUCTIONS.md|node_modules)
+      install|install.sh|install.mjs|install.cmd|INSTALL.md|DEPLOY_NOW.md|DEPLOYMENT_INSTRUCTIONS.md)
         continue
         ;;
       *)
@@ -217,15 +217,6 @@ do_install() {
         ;;
     esac
   done
-
-  # Run npm install
-  info "Installing dependencies..."
-  if command -v npm >/dev/null 2>&1; then
-    (cd "$TARGET_DIR" && npm install --production --silent 2>/dev/null) || \
-    (cd "$TARGET_DIR" && npm install --production)
-  else
-    warn "npm not found, skipping dependency installation"
-  fi
 
   # Install skills and commands
   install_skills

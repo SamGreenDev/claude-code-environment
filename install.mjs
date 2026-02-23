@@ -14,7 +14,7 @@ const __dirname = dirname(__filename);
 
 const COMPONENT_NAME = 'environment';
 const COMPONENT_TYPE = 'plugin';
-const COMPONENT_VERSION = '1.1.0';
+const COMPONENT_VERSION = '1.1.5';
 
 const HOME = homedir();
 const TARGET_DIR = join(HOME, '.claude', 'plugins', 'local', COMPONENT_NAME);
@@ -193,13 +193,12 @@ function installCommands() {
 
 const SKIP_FILES = new Set([
   'install', 'install.sh', 'install.mjs', 'install.cmd',
-  'INSTALL.md', 'DEPLOY_NOW.md', 'DEPLOYMENT_INSTRUCTIONS.md', 'node_modules'
+  'INSTALL.md', 'DEPLOY_NOW.md', 'DEPLOYMENT_INSTRUCTIONS.md'
 ]);
 
 function doInstall() {
   if (DRY_RUN) {
     info(`[DRY RUN] Would install to ${TARGET_DIR}`);
-    info('[DRY RUN] Would run npm install --production');
     installSkills();
     installCommands();
     info('[DRY RUN] Would create .installed-manifest.json');
@@ -221,18 +220,6 @@ function doInstall() {
       copyDirRecursive(src, dest);
     } else {
       copyFileSync(src, dest);
-    }
-  }
-
-  // npm install
-  info('Installing dependencies...');
-  try {
-    execSync('npm install --production --silent', { cwd: TARGET_DIR, stdio: 'pipe' });
-  } catch {
-    try {
-      execSync('npm install --production', { cwd: TARGET_DIR, stdio: 'inherit' });
-    } catch {
-      warn('npm install failed or npm not found, skipping dependency installation');
     }
   }
 
