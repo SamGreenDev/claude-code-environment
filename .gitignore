@@ -21,6 +21,9 @@ dist/
 .agent-state.json
 .session-state.json
 
+# Mission output files
+mission-outputs/
+
 # Claude Code local config
 .claude/
 
