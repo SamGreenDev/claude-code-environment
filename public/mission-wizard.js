@@ -715,24 +715,26 @@
         }
       }
 
-      // Assign positions: layers go left-to-right, nodes within layer are centered vertically
-      const LAYER_X_GAP = 220;
-      const NODE_Y_GAP = 120;
+      // Assign positions: layers go top-to-bottom, nodes within layer are centered horizontally
+      const LAYER_Y_GAP = 160;
+      const NODE_X_GAP = 240;
       const START_X = 80;
-      const START_Y = 80;
+      const START_Y = 60;
 
       const nodeMap = new Map(nodes.map(n => [n.id, n]));
+      const maxLayerWidth = Math.max(...layers.map(l => l.length));
+      const canvasWidth = Math.max(600, maxLayerWidth * NODE_X_GAP);
 
       for (let layerIdx = 0; layerIdx < layers.length; layerIdx++) {
         const layer = layers[layerIdx];
-        const x = START_X + layerIdx * LAYER_X_GAP;
-        const totalHeight = (layer.length - 1) * NODE_Y_GAP;
-        const startY = START_Y + Math.max(0, (300 - totalHeight) / 2);
+        const y = START_Y + layerIdx * LAYER_Y_GAP;
+        const totalWidth = (layer.length - 1) * NODE_X_GAP;
+        const startX = START_X + Math.max(0, (canvasWidth - totalWidth) / 2);
 
         for (let nodeIdx = 0; nodeIdx < layer.length; nodeIdx++) {
           const node = nodeMap.get(layer[nodeIdx]);
           if (node) {
-            node.position = { x, y: startY + nodeIdx * NODE_Y_GAP };
+            node.position = { x: startX + nodeIdx * NODE_X_GAP, y };
           }
         }
       }
