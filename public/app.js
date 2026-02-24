@@ -2305,6 +2305,24 @@ function renderMissionBuilderPage() {
   requestAnimationFrame(() => {
     if (window.MissionBuilder) {
       state.missionBuilder = new window.MissionBuilder('mission-builder-container');
+
+      // Load mission from URL param (e.g. from List → Edit)
+      const hashParts = window.location.hash.split('?');
+      if (hashParts[1]) {
+        const urlParams = new URLSearchParams(hashParts[1]);
+        const missionId = urlParams.get('mission');
+        if (missionId) {
+          fetch(`/api/missions/${missionId}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(json => {
+              if (json) {
+                const mission = json.data || json;
+                state.missionBuilder.loadMission(mission);
+              }
+            })
+            .catch(() => {});
+        }
+      }
     }
   });
 }
