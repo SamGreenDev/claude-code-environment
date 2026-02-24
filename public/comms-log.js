@@ -583,7 +583,7 @@ class CommsLog {
           entries.push({ type: 'DISPATCH', nodeLabel: label, message: `Node started`, timestamp: state.startedAt });
         }
         if (state.status === 'completed' && state.completedAt) {
-          const outputPreview = state.output ? String(state.output).slice(0, 300) : 'Completed';
+          const outputPreview = state.output ? String(state.output).slice(0, 500) : 'Completed';
           entries.push({ type: 'COMPLETE', nodeLabel: label, message: outputPreview, timestamp: state.completedAt });
         }
         if (state.status === 'failed' && state.completedAt) {

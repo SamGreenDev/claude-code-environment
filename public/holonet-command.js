@@ -252,7 +252,7 @@
       white-space: nowrap;
       color: #fff;
     }
-    .hc-comm-msg { color: #C0C0C0; flex: 1; }
+    .hc-comm-msg { color: #C0C0C0; flex: 1; word-break: break-word; }
     .hc-comm-DISPATCH { border-left-color: #4fa4ff22; }
     .hc-comm-COMPLETE { border-left-color: #2D6A4F44; }
     .hc-comm-FAIL     { border-left-color: #DC262644; }
@@ -399,7 +399,17 @@
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .hc-overlay-config {
+      display: flex;
+      gap: 12px;
       margin-bottom: 14px;
+    }
+    .hc-overlay-config-item {
+      font-size: 11px;
+      color: #777;
+      letter-spacing: 0.03em;
     }
     .hc-overlay-section { margin-top: 12px; }
     .hc-overlay-section-label { font-size: 11px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
@@ -1033,6 +1043,7 @@
         const status = (typeof statusEntry === 'string' ? statusEntry : statusEntry.status) || 'pending';
         const startMs = statusEntry.startedAt ? new Date(statusEntry.startedAt).getTime() : null;
 
+        const config = task.config || {};
         this.nodes.set(id, {
           id,
           label: task.label || task.name || id,
@@ -1042,6 +1053,9 @@
           output: statusEntry.output || null,
           error: statusEntry.error || null,
           files: statusEntry.files || [],
+          timeout: config.timeout || null,
+          maxRetries: config.retries ?? 1,
+          retryCount: statusEntry.retryCount || 0,
         });
       });
 
@@ -1156,7 +1170,7 @@
             this._addComm('DISPATCH', label, `Execution started${state.startedAt ? ' at ' + new Date(state.startedAt).toLocaleTimeString() : ''}`);
           } else if (st === 'completed') {
             this._addComm('DISPATCH', label, 'Execution started');
-            this._addComm('COMPLETE', label, state.output ? `Output: ${String(state.output).slice(0, 80)}` : 'Completed');
+            this._addComm('COMPLETE', label, state.output ? `Output: ${String(state.output).slice(0, 500)}` : 'Completed');
           } else if (st === 'failed') {
             this._addComm('DISPATCH', label, 'Execution started');
             this._addComm('FAIL', label, state.error || 'Node failed');
@@ -1172,7 +1186,7 @@
           if (Array.isArray(msgs)) {
             for (const m of msgs) {
               const msgLabel = m.nodeId ? this._nodeLabel(m.nodeId) : (m.from || 'SYSTEM');
-              this._addComm('OUTPUT', msgLabel, String(m.content || m.message || '').slice(0, 120));
+              this._addComm('OUTPUT', msgLabel, String(m.content || m.message || '').slice(0, 500));
             }
           }
         } catch (_) { /* best effort */ }
@@ -1332,7 +1346,7 @@
         case 'node_completed': {
           const files = msg.files || [];
           this._updateNodeStatus(nodeId, 'completed', { output: msg.output || null, files });
-          let completeMsg = msg.output ? `Output: ${String(msg.output).slice(0, 80)}` : 'Completed';
+          let completeMsg = msg.output ? `Output: ${String(msg.output).slice(0, 500)}` : 'Completed';
           if (files.length) completeMsg += ` (${files.length} file${files.length > 1 ? 's' : ''} created)`;
           this._addComm('COMPLETE', this._nodeLabel(nodeId), completeMsg);
           this._checkRunComplete();
@@ -1345,7 +1359,7 @@
           break;
 
         case 'node_retrying':
-          this._updateNodeStatus(nodeId, 'retrying');
+          this._updateNodeStatus(nodeId, 'retrying', { retryCount: msg.retryCount || msg.attempt || 0 });
           this._addComm('RETRY', this._nodeLabel(nodeId), `Retry attempt ${msg.retryCount || msg.attempt || ''}`);
           break;
 
@@ -1375,7 +1389,7 @@
           const m = msg.message || {};
           const fromLabel = m.from ? this._nodeLabel(m.from) : 'AGENT';
           const toLabel = m.to ? this._nodeLabel(m.to) : 'ALL';
-          const content = String(m.content || '').slice(0, 120);
+          const content = String(m.content || '').slice(0, 500);
           this._addComm('OUTPUT', fromLabel, `→ ${toLabel}: ${content}`);
           break;
         }
@@ -1587,6 +1601,15 @@
       const panel = document.createElement('div');
       panel.className = 'hc-overlay-panel';
 
+      // Format timeout for display
+      const fmtTimeout = (sec) => {
+        if (!sec) return null;
+        if (sec < 60) return `${sec}s`;
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return s ? `${m}m ${s}s` : `${m}m`;
+      };
+
       let html = `
         <button class="hc-overlay-close" id="hc-ov-close">✕</button>
         <div class="hc-overlay-title">${this._esc(node.label)}</div>
@@ -1594,6 +1617,10 @@
         <span class="hc-overlay-status" style="background:${c.fill};border:1px solid ${c.border};color:${c.text}">
           ${node.status.toUpperCase()}
         </span>
+        <div class="hc-overlay-config">
+          <span class="hc-overlay-config-item" title="Timeout">⏱ ${node.timeout ? fmtTimeout(node.timeout) : 'No limit'}</span>
+          <span class="hc-overlay-config-item" title="Retries">↻ ${node.retryCount || 0} / ${node.maxRetries ?? 1}</span>
+        </div>
       `;
 
       if (node.output) {
