@@ -4,7 +4,7 @@ A web-based visualization tool for exploring and managing your Claude Code confi
 
 **Plugin Name:** environment
 **Author:** Sam Green
-**Version:** 1.1.9
+**Version:** 1.1.10
 
 ---
 
